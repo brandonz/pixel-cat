@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#08081c">
+  <title>Pixel Cat 🐱</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body {
+      background: #08081c;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    #stars {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(10px, 2.5vh, 22px);
+      padding: 16px;
+    }
+    .title {
+      color: #ff88ff;
+      font-size: clamp(8px, 3.5vw, 16px);
+      text-shadow: 0 0 14px #ff44ff, 2px 2px 0 #440044;
+      letter-spacing: 4px;
+    }
+    .crt-frame {
+      position: relative;
+      background: #06090f;
+      border: 4px solid #3a3a6a;
+      border-radius: 8px;
+      padding: clamp(16px, 4vw, 28px);
+      box-shadow:
+        0 0 0 2px #1a1a3a,
+        0 0 40px #5533cc44,
+        0 0 80px #33226688,
+        inset 0 0 50px #00000099;
+    }
+    .crt-frame::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 2px,
+        rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      border-radius: 4px;
+      z-index: 2;
+    }
+    #cat {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      position: relative;
+      z-index: 1;
+    }
+    #mode-label {
+      font-size: clamp(7px, 2.5vw, 11px);
+      color: #88ff88;
+      text-shadow: 0 0 8px #44ff44;
+      letter-spacing: 2px;
+      transition: color 0.6s, text-shadow 0.6s;
+    }
+    #mode-label.sleeping {
+      color: #aaaaff;
+      text-shadow: 0 0 10px #6666ff;
+    }
+    #hint-label {
+      font-size: clamp(5px, 1.6vw, 8px);
+      color: #2a2a44;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+    #hearts {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<canvas id="hearts"></canvas>
+
+<div class="wrapper">
+  <div class="title">&#9733; PIXEL CAT &#9733;</div>
+  <div class="crt-frame">
+    <canvas id="cat"></canvas>
+  </div>
+  <div id="mode-label">&#9829; IDLE &#9829;</div>
+  <div id="hint-label">TAP TO PET &nbsp;&#9733;&nbsp; SLEEPS AFTER 10S</div>
+</div>
+
+<script>
+// ─── PALETTE ───
+const _ = null;
+const K = '#180e08';
+const O = '#f4a460';
+const L = '#ffd49c';
+const D = '#c47c22';
+const Pk= '#ffb0cc';
+const E = '#00cc55';
+const Ep= '#003311';
+const Ns= '#ee4477';
+const W = '#f5f0e8';
+const Bl= '#1a8cf0'; // closed-eye shine
+
+// ─── SPRITE DEFINITIONS (14×18) ───
+const FRAME_IDLE = [
+  [_,_,K,K,_,_,_,_,_,K,K,_,_,_],
+  [_,K,O,O,K,_,_,_,K,O,O,K,_,_],
+  [_,K,Pk,O,K,_,_,_,K,O,Pk,K,_,_],
+  [_,K,O,O,K,K,K,K,K,O,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,K,O,L,O,O,O,O,O,L,O,O,K,_],
+  [_,K,O,E,Ep,O,O,O,E,Ep,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,K,O,W,O,Ns,Ns,O,W,O,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,_,K,O,D,O,O,O,O,D,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,O,D,O,O,O,O,D,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,K,_,_,_,_,_,_,K,K,_,_],
+  [_,K,O,O,K,_,_,_,_,K,O,O,K,_],
+  [_,K,L,Pk,K,_,_,_,_,K,L,Pk,K,_],
+  [_,_,K,K,_,_,_,_,_,_,K,K,_,_],
+];
+
+const FRAME_BLINK = [
+  [_,_,K,K,_,_,_,_,_,K,K,_,_,_],
+  [_,K,O,O,K,_,_,_,K,O,O,K,_,_],
+  [_,K,Pk,O,K,_,_,_,K,O,Pk,K,_,_],
+  [_,K,O,O,K,K,K,K,K,O,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,K,O,L,O,O,O,O,O,L,O,O,K,_],
+  [_,K,O,K,K,O,O,O,K,K,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,K,O,W,O,Ns,Ns,O,W,O,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,_,K,O,D,O,O,O,O,D,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,O,D,O,O,O,O,D,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,K,_,_,_,_,_,_,K,K,_,_],
+  [_,K,O,O,K,_,_,_,_,K,O,O,K,_],
+  [_,K,L,Pk,K,_,_,_,_,K,L,Pk,K,_],
+  [_,_,K,K,_,_,_,_,_,_,K,K,_,_],
+];
+
+const FRAME_SLEEP = [
+  [_,_,K,K,_,_,_,_,_,K,K,_,_,_],
+  [_,K,O,O,K,_,_,_,K,O,O,K,_,_],
+  [_,K,Pk,O,K,_,_,_,K,O,Pk,K,_,_],
+  [_,K,O,O,K,K,K,K,K,O,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,K,O,L,O,O,O,O,O,L,O,O,K,_],
+  [_,K,O,K,K,O,O,O,K,K,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,K,O,W,O,Ns,Ns,O,W,O,O,O,K,_],
+  [_,K,O,O,O,O,O,O,O,O,O,O,K,_],
+  [_,_,K,O,D,O,O,O,O,D,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,O,O,O,O,O,O,O,O,K,_,_],
+  [_,_,K,K,O,O,O,O,O,O,K,K,_,_],
+  [_,_,_,K,O,O,O,O,O,O,K,_,_,_],
+  [_,_,_,K,O,O,O,O,O,O,K,_,_,_],
+  [_,_,_,K,L,Pk,Pk,Pk,L,K,_,_,_,_],
+  [_,_,_,_,K,K,K,K,K,_,_,_,_,_],
+];
+
+// idle sequence: open, open, open, open, open, open, blink, open, open, open
+const IDLE_SEQ  = [FRAME_IDLE,FRAME_IDLE,FRAME_IDLE,FRAME_IDLE,FRAME_IDLE,FRAME_IDLE,FRAME_BLINK,FRAME_IDLE,FRAME_IDLE,FRAME_IDLE];
+const SLEEP_SEQ = [FRAME_SLEEP];
+
+const COLS = 14, ROWS = 18;
+const PX = Math.max(Math.round(Math.min(window.innerWidth * 0.08, window.innerHeight * 0.065, 28)), 10);
+
+// ─── CANVAS SETUP ───
+const catCanvas = document.getElementById('cat');
+catCanvas.width  = COLS * PX;
+catCanvas.height = ROWS * PX;
+const ctx = catCanvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// ─── STAR BACKGROUND ───
+const starCanvas = document.getElementById('stars');
+const sctx = starCanvas.getContext('2d');
+function resizeStars() {
+  starCanvas.width  = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+  sctx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+  for (let i = 0; i < 80; i++) {
+    const x = Math.random() * starCanvas.width;
+    const y = Math.random() * starCanvas.height;
+    const r = Math.random() * 1.5;
+    const a = 0.2 + Math.random() * 0.7;
+    sctx.beginPath();
+    sctx.arc(x, y, r, 0, Math.PI * 2);
+    sctx.fillStyle = `rgba(${180+Math.random()*75},${180+Math.random()*75},255,${a})`;
+    sctx.fill();
+  }
+}
+resizeStars();
+window.addEventListener('resize', resizeStars);
+
+// ─── FLOATING HEARTS ───
+const heartCanvas = document.getElementById('hearts');
+heartCanvas.width  = window.innerWidth;
+heartCanvas.height = window.innerHeight;
+const hctx = heartCanvas.getContext('2d');
+window.addEventListener('resize', () => {
+  heartCanvas.width  = window.innerWidth;
+  heartCanvas.height = window.innerHeight;
+});
+
+const hearts = [];
+function spawnHeart(x, y) {
+  for (let i = 0; i < 3; i++) {
+    hearts.push({
+      x: x + (Math.random() - 0.5) * 60,
+      y: y,
+      vy: -(1.5 + Math.random() * 2),
+      vx: (Math.random() - 0.5) * 1.5,
+      size: 8 + Math.random() * 14,
+      alpha: 1,
+      hue: Math.floor(Math.random() * 60) - 20, // pinkish
+    });
+  }
+}
+function drawHeart(ctx, x, y, size, alpha, hue) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = `hsl(${340 + hue}, 100%, 70%)`;
+  ctx.shadowColor = `hsl(${340 + hue}, 100%, 80%)`;
+  ctx.shadowBlur = 8;
+  ctx.translate(x, y);
+  ctx.beginPath();
+  const s = size / 15;
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(-s*7, -s*6, -s*14, s*2, 0, s*10);
+  ctx.bezierCurveTo(s*14, s*2, s*7, -s*6, 0, 0);
+  ctx.fill();
+  ctx.restore();
+}
+function updateHearts() {
+  hctx.clearRect(0, 0, heartCanvas.width, heartCanvas.height);
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i];
+    h.x += h.vx;
+    h.y += h.vy;
+    h.alpha -= 0.016;
+    if (h.alpha <= 0) { hearts.splice(i, 1); continue; }
+    drawHeart(hctx, h.x, h.y, h.size, h.alpha, h.hue);
+  }
+}
+
+// ─── ZZZ PARTICLES ───
+const zzz = [];
+let zzzTimer = 0;
+function spawnZzz() {
+  const rect = catCanvas.getBoundingClientRect();
+  zzz.push({
+    x: rect.right - 10,
+    y: rect.top + rect.height * 0.3,
+    text: Math.random() < 0.5 ? 'z' : 'Z',
+    vy: -(0.6 + Math.random() * 0.5),
+    vx: 0.3 + Math.random() * 0.5,
+    alpha: 1,
+    size: 10 + Math.floor(Math.random() * 10),
+  });
+}
+function updateZzz() {
+  for (let i = zzz.length - 1; i >= 0; i--) {
+    const z = zzz[i];
+    z.x += z.vx;
+    z.y += z.vy;
+    z.alpha -= 0.012;
+    if (z.alpha <= 0) { zzz.splice(i, 1); continue; }
+    hctx.save();
+    hctx.globalAlpha = z.alpha;
+    hctx.fillStyle = '#aaaaff';
+    hctx.shadowColor = '#6666ff';
+    hctx.shadowBlur = 6;
+    hctx.font = `${z.size}px 'Press Start 2P', monospace`;
+    hctx.fillText(z.text, z.x, z.y);
+    hctx.restore();
+  }
+}
+
+// ─── STATE ───
+let sleeping = false;
+let frameIdx = 0;
+let lastFrameTime = 0;
+let lastInteraction = Date.now();
+const SLEEP_AFTER = 10000;
+const FRAME_MS_IDLE  = 400;
+const FRAME_MS_SLEEP = 800;
+
+const modeLabel = document.getElementById('mode-label');
+
+function drawFrame(frame) {
+  ctx.clearRect(0, 0, catCanvas.width, catCanvas.height);
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const color = frame[row][col];
+      if (color === null) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(col * PX, row * PX, PX, PX);
+    }
+  }
+}
+
+function setMode(isSleeping) {
+  sleeping = isSleeping;
+  frameIdx = 0;
+  if (isSleeping) {
+    modeLabel.textContent = '💤 SLEEPING 💤';
+    modeLabel.classList.add('sleeping');
+  } else {
+    modeLabel.textContent = '♥ IDLE ♥';
+    modeLabel.classList.remove('sleeping');
+  }
+}
+
+// ─── ANIMATION LOOP ───
+function loop(ts) {
+  requestAnimationFrame(loop);
+
+  // check sleep transition
+  const now = Date.now();
+  if (!sleeping && now - lastInteraction > SLEEP_AFTER) setMode(true);
+
+  // advance frame
+  const frameMs = sleeping ? FRAME_MS_SLEEP : FRAME_MS_IDLE;
+  if (ts - lastFrameTime > frameMs) {
+    lastFrameTime = ts;
+    const seq = sleeping ? SLEEP_SEQ : IDLE_SEQ;
+    frameIdx = (frameIdx + 1) % seq.length;
+    drawFrame(seq[frameIdx]);
+
+    if (sleeping) {
+      zzzTimer++;
+      if (zzzTimer % 4 === 0) spawnZzz();
+    }
+  }
+
+  // update particles
+  updateHearts();
+  updateZzz();
+}
+
+// ─── INTERACTION ───
+function onInteract(e) {
+  if (sleeping) {
+    setMode(false);
+  }
+  lastInteraction = Date.now();
+  const rect = catCanvas.getBoundingClientRect();
+  let cx, cy;
+  if (e.touches && e.touches.length > 0) {
+    cx = e.touches[0].clientX;
+    cy = e.touches[0].clientY;
+  } else {
+    cx = e.clientX;
+    cy = e.clientY;
+  }
+  spawnHeart(cx, cy);
+}
+
+document.addEventListener('click',     onInteract);
+document.addEventListener('touchstart', onInteract, { passive: true });
+document.addEventListener('mousemove', () => { lastInteraction = Date.now(); });
+
+// ─── KICK OFF ───
+drawFrame(IDLE_SEQ[0]);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
