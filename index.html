@@ -23,15 +23,12 @@
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
-    #bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-    #fx { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+    #bg  { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    #fx  { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
     .wrapper {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: clamp(10px, 2.5vh, 20px);
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column;
+      align-items: center; gap: clamp(10px, 2.5vh, 20px);
       padding: 16px;
     }
     .title {
@@ -42,105 +39,373 @@
     }
     .screen {
       position: relative;
-      background: radial-gradient(ellipse at 50% 30%, #1a1a3a 0%, #080814 100%);
-      border-radius: 18px;
-      padding: 6px;
+      background: radial-gradient(ellipse at 50% 30%, #1a1a3a 0%, #060812 100%);
+      border-radius: 16px; padding: 5px;
       box-shadow:
-        0 0 0 3px #2a2a5a,
-        0 0 0 6px #111128,
-        0 0 50px #4422aa55,
-        0 0 100px #221155aa,
+        0 0 0 3px #2a2a5a, 0 0 0 6px #111128,
+        0 0 50px #4422aa55, 0 0 100px #221155aa,
         inset 0 0 40px #00000077;
     }
     .screen-inner {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #0a0a1e;
+      position: relative; border-radius: 10px;
+      overflow: hidden; background: #07071a;
     }
-    /* scanlines */
     .screen-inner::after {
-      content: '';
-      position: absolute;
-      inset: 0;
+      content: ''; position: absolute; inset: 0;
       background: repeating-linear-gradient(
-        0deg,
-        transparent 0, transparent 3px,
-        rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px
+        0deg, transparent 0, transparent 3px,
+        rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px
       );
-      pointer-events: none;
-      z-index: 10;
-      border-radius: 12px;
+      pointer-events: none; z-index: 10; border-radius: 10px;
     }
-    /* glare */
     .screen-inner::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 5%; right: 5%;
-      height: 40%;
-      background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 11;
+      content: ''; position: absolute;
+      top: 0; left: 5%; right: 5%; height: 40%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 11;
     }
     #cat { display: block; }
     #mode-label {
       font-size: clamp(6px, 2.2vw, 10px);
-      color: #88ff88;
-      text-shadow: 0 0 8px #44ff44;
-      letter-spacing: 2px;
-      transition: color 0.8s, text-shadow 0.8s;
+      color: #88ff88; text-shadow: 0 0 8px #44ff44;
+      letter-spacing: 2px; transition: color .8s, text-shadow .8s;
     }
-    #mode-label.sleeping {
-      color: #aaaaff;
-      text-shadow: 0 0 10px #6666ff;
-    }
+    #mode-label.sleeping { color: #aaaaff; text-shadow: 0 0 10px #6666ff; }
     #hint-label {
       font-size: clamp(4px, 1.4vw, 7px);
-      color: #252545;
-      letter-spacing: 1px;
-      text-align: center;
+      color: #252545; letter-spacing: 1px; text-align: center;
     }
   </style>
 </head>
 <body>
 <canvas id="bg"></canvas>
 <canvas id="fx"></canvas>
-
 <div class="wrapper">
   <div class="title">&#9733; PIXEL CAT &#9733;</div>
-  <div class="screen">
-    <div class="screen-inner">
-      <canvas id="cat"></canvas>
-    </div>
-  </div>
+  <div class="screen"><div class="screen-inner"><canvas id="cat"></canvas></div></div>
   <div id="mode-label">&#9829; IDLE &#9829;</div>
   <div id="hint-label">TAP TO PET &#9733; SLEEPS AFTER 10S</div>
 </div>
-
 <script>
-// ─────────────────────────────────────────────────────
-// CONFIG
-// ─────────────────────────────────────────────────────
-const SIZE = Math.round(Math.min(window.innerWidth * 0.72, window.innerHeight * 0.55, 320));
-const C = document.getElementById('cat');
-C.width = SIZE;
-C.height = SIZE;
-const ctx = C.getContext('2d');
+// ═══════════════════════════════════════════════
+//  GRID SETUP
+// ═══════════════════════════════════════════════
+const GW = 30;   // grid cols
+const GH = 36;   // grid rows
+const GS = Math.max(6, Math.min(11,
+  Math.floor(Math.min(window.innerWidth * 0.72, window.innerHeight * 0.58) / GH)
+));
 
-// ─────────────────────────────────────────────────────
-// STAR BG
-// ─────────────────────────────────────────────────────
-const bg = document.getElementById('bg');
-const bctx = bg.getContext('2d');
+const cv = document.getElementById('cat');
+cv.width  = GW * GS;
+cv.height = GH * GS;
+const cx = cv.getContext('2d');
+cx.imageSmoothingEnabled = false;
+
+// ═══════════════════════════════════════════════
+//  PALETTE
+// ═══════════════════════════════════════════════
+const O  = '#F5A030';   // base fur (warm orange)
+const OL = '#FFCF7A';   // light fur (muzzle, belly)
+const OD = '#C47028';   // dark fur (top, flanks)
+const S  = '#7B3900';   // tabby stripe
+const K  = '#1A0A00';   // outline / dark
+const Pk = '#FFB8D0';   // pink (ear inner, nose pad)
+const Ns = '#FF4477';   // nose
+const Ew = '#FFFCE8';   // eye white
+const Eg = '#33CC55';   // eye iris (green)
+const Ep = '#001408';   // eye pupil
+const EH = '#FFFFFF';   // eye highlight
+const W  = '#FFFBCC';   // whisker / white detail
+const NC = null;        // transparent
+
+// ═══════════════════════════════════════════════
+//  DRAW HELPERS
+// ═══════════════════════════════════════════════
+// B(gx, gy, gw, gh, color) — fill a block
+function B(x, y, w, h, c) {
+  if (!c) return;
+  cx.fillStyle = c;
+  cx.fillRect(x*GS, y*GS, w*GS, h*GS);
+}
+// thin line (sub-grid, for whiskers)
+function LINE(x1, y1, x2, y2, c, lw) {
+  cx.save();
+  cx.strokeStyle = c;
+  cx.lineWidth = lw || Math.max(1, GS * 0.18);
+  cx.globalAlpha = 0.75;
+  cx.lineCap = 'round';
+  cx.beginPath();
+  cx.moveTo(x1*GS, y1*GS);
+  cx.lineTo(x2*GS, y2*GS);
+  cx.stroke();
+  cx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  IDLE CAT DRAW
+//  by     = body Y offset (0 or 1 for bob)
+//  blink  = 0 open, 1 half, 2 closed
+//  tailDx = -1 / 0 / +1 for tail wag
+// ═══════════════════════════════════════════════
+function drawIdle(by, blink, tailDx) {
+  cx.clearRect(0, 0, cv.width, cv.height);
+
+  // ── TAIL (behind body) ──────────────────────
+  const tx = 1 + tailDx; // tail x nudge
+  B(22+tx, 22+by, 4, 3, O);
+  B(24+tx, 19+by, 4, 4, O);
+  B(26+tx, 16+by, 3, 4, O);
+  B(25+tx, 14+by, 4, 3, OL);   // tail tip
+  // tail stripes
+  B(22+tx, 23+by, 4, 1, S);
+  B(24+tx, 21+by, 4, 1, S);
+  B(26+tx, 18+by, 3, 1, S);
+  B(25+tx, 15+by, 4, 1, S);
+  // tail outline
+  B(22+tx, 22+by, 4, 1, K); B(26+tx, 22+by, 1, 1, K);
+  B(28+tx, 16+by, 1, 4, K); B(22+tx, 24+by, 1, 1, K);
+
+  // ── BODY ────────────────────────────────────
+  B(4, 17+by, 22, 14, O);           // body base
+  B(6, 19+by, 18, 10, OL);          // belly lighter
+  // body stripes (horizontal bands)
+  B(4, 19+by, 22, 2, S);
+  B(4, 23+by, 22, 2, S);
+  B(4, 27+by, 22, 2, S);
+  // break stripes up with fur colour gaps so they look like tabby, not uniform
+  B(7, 19+by, 12, 2, OD);
+  B(7, 23+by, 12, 2, OD);
+  B(7, 27+by, 12, 2, OD);
+  B(9, 20+by, 4, 1, O);
+  B(9, 24+by, 4, 1, O);
+  B(9, 28+by, 4, 1, O);
+  // body outline
+  B(4, 17+by, 22, 1, K); B(4, 30+by, 22, 1, K);
+  B(4, 17+by, 1, 13, K); B(25, 17+by, 1, 13, K);
+
+  // ── PAWS ────────────────────────────────────
+  B(4,  30+by, 8, 5, O);   // left paw
+  B(18, 30+by, 8, 5, O);   // right paw
+  B(5,  30+by, 6, 2, OL);  // left paw top highlight
+  B(19, 30+by, 6, 2, OL);  // right paw top highlight
+  // toe beans
+  B(5,  33+by, 2, 1, Pk); B(7,  33+by, 2, 1, Pk); B(9, 33+by, 2, 1, Pk);
+  B(19, 33+by, 2, 1, Pk); B(21, 33+by, 2, 1, Pk); B(23,33+by, 2, 1, Pk);
+  // paw outlines
+  B(4, 30+by, 1, 5, K); B(11, 30+by, 1, 5, K); B(4, 34+by, 8, 1, K);
+  B(18,30+by, 1, 5, K); B(25, 30+by, 1, 5, K); B(18,34+by, 8, 1, K);
+
+  // ── EARS (behind head) ──────────────────────
+  // Left ear
+  B(5, 2, 2, 2, O);      // ear tip
+  B(4, 3, 4, 3, O);      // ear base
+  B(5, 3, 2, 2, Pk);     // inner pink
+  B(4, 2, 1, 4, K);      // left outline
+  B(5, 1, 2, 1, K);      // top outline
+  B(7, 3, 1, 3, K);      // right outline
+  // Right ear
+  B(23, 2, 2, 2, O);
+  B(22, 3, 4, 3, O);
+  B(23, 3, 2, 2, Pk);
+  B(25, 2, 1, 4, K);
+  B(23, 1, 2, 1, K);
+  B(22, 3, 1, 3, K);
+
+  // ── HEAD BASE ───────────────────────────────
+  B(3, 5, 24, 14, O);        // head
+  B(3, 5, 24, 3,  OD);       // top of head slightly darker
+  // outline
+  B(3, 5, 24, 1, K); B(3, 18, 24, 1, K);
+  B(3, 5, 1, 13, K); B(26, 5, 1, 13, K);
+
+  // ── TABBY M MARKING ─────────────────────────
+  B(7,  5, 2, 5, S);    // left stroke of M
+  B(13, 5, 4, 2, S);    // top center of M
+  B(21, 5, 2, 5, S);    // right stroke of M
+  B(9,  6, 4, 3, S);    // M left arm
+  B(17, 6, 4, 3, S);    // M right arm
+  B(13, 7, 4, 2, O);    // M center gap (break it up)
+
+  // cheek stripes
+  B(3,  12, 4, 2, S);   // left cheek stripe
+  B(23, 12, 4, 2, S);   // right cheek stripe
+
+  // ── CHEEK LIGHT PATCHES ─────────────────────
+  B(3, 11, 5, 5, OL);   // left cheek
+  B(22, 11, 5, 5, OL);  // right cheek
+
+  // ── MUZZLE ──────────────────────────────────
+  B(8, 12, 14, 6, OL);   // muzzle base
+  B(8, 12, 14, 1, O);    // muzzle top edge blend
+
+  // ── EYES ────────────────────────────────────
+  if (blink === 0) {
+    // Left eye (open)
+    B(6,  8, 6, 5, Ew);    // white
+    B(7,  8, 4, 5, Eg);    // iris
+    B(8,  9, 2, 4, Ep);    // pupil (tall rectangle)
+    B(7,  8, 1, 2, EH);    // highlight
+    B(6,  8, 6, 1, K);     // top outline
+    B(6,  12,6, 1, K);     // bottom outline
+    B(6,  8, 1, 5, K);     // left outline
+    B(11, 8, 1, 5, K);     // right outline
+    // Right eye (open)
+    B(18, 8, 6, 5, Ew);
+    B(18, 8, 4, 5, Eg);
+    B(19, 9, 2, 4, Ep);
+    B(18, 8, 1, 2, EH);
+    B(18, 8, 6, 1, K);
+    B(18, 12,6, 1, K);
+    B(18, 8, 1, 5, K);
+    B(23, 8, 1, 5, K);
+  } else if (blink === 1) {
+    // Half blink
+    B(6,  10, 6, 3, Ew); B(7, 10, 4, 3, Eg); B(8, 11, 2, 2, Ep);
+    B(18, 10, 6, 3, Ew); B(18,10, 4, 3, Eg); B(19,11, 2, 2, Ep);
+    B(6,  10, 6, 1, K);  B(6, 12, 6, 1, K);
+    B(18, 10, 6, 1, K);  B(18,12, 6, 1, K);
+  } else {
+    // Closed — cute happy squint
+    B(6,  11, 6, 1, K);  B(7, 10, 4, 1, K);   // left arc
+    B(18, 11, 6, 1, K);  B(18,10, 4, 1, K);   // right arc
+  }
+
+  // ── NOSE ────────────────────────────────────
+  B(13, 14, 4, 2, Ns);    // nose block
+  B(14, 14, 2, 1, Pk);    // nose top lighter
+  B(13, 14, 4, 1, K);     // nose top outline
+  B(13, 15, 1, 1, K); B(16, 15, 1, 1, K);  // sides
+
+  // ── MOUTH ───────────────────────────────────
+  B(14, 16, 2, 1, K);          // center philtrum
+  B(11, 17, 3, 1, K);          // left lip
+  B(16, 17, 3, 1, K);          // right lip
+
+  // ── WHISKERS ────────────────────────────────
+  // Left side whiskers (3 lines going left)
+  LINE(8, 13.5, 0.5, 12.5, W);
+  LINE(8, 14.5, 0.5, 14.5, W);
+  LINE(8, 15.5, 0.5, 16.5, W);
+  // Right side whiskers
+  LINE(22, 13.5, 29.5, 12.5, W);
+  LINE(22, 14.5, 29.5, 14.5, W);
+  LINE(22, 15.5, 29.5, 16.5, W);
+}
+
+// ═══════════════════════════════════════════════
+//  SLEEPING CAT DRAW  (loaf / curled pose)
+// ═══════════════════════════════════════════════
+function drawSleep(phase) {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  const breathe = Math.sin(phase * 0.003) > 0 ? 0 : 0; // subtle
+  const bp = 0; // no actual offset for now, keep it stable
+
+  // ── BODY LOAF ───────────────────────────────
+  B(2, 19, 26, 12, O);         // body blob
+  B(3, 20, 24, 10, OL);        // belly lighter
+  // body stripes
+  B(2, 21, 26, 2, S);
+  B(6, 21, 14, 2, OD);         // break up stripe
+  B(2, 25, 26, 2, S);
+  B(6, 25, 14, 2, OD);
+  B(2, 29, 26, 2, S);
+  B(6, 29, 14, 2, OD);
+  // body outline
+  B(2, 19, 26, 1, K); B(2, 30, 26, 1, K);
+  B(2, 19, 1, 11, K); B(27, 19, 1, 11, K);
+
+  // ── TUCKED PAWS ─────────────────────────────
+  B(5, 29, 8, 3, O);   // left paw
+  B(17,29, 8, 3, O);   // right paw
+  B(5, 29, 8, 1, OL);  B(17,29, 8, 1, OL);  // highlight
+  B(6, 31, 2, 1, Pk);  B(8, 31, 2, 1, Pk);   // left toe beans
+  B(18,31, 2, 1, Pk);  B(20,31, 2, 1, Pk);   // right toe beans
+  B(5, 29, 1, 3, K);   B(12,29, 1, 3, K);    // left paw outline
+  B(17,29, 1, 3, K);   B(24,29, 1, 3, K);    // right paw outline
+  B(5, 31, 8, 1, K);   B(17,31, 8, 1, K);    // bottom
+
+  // ── TAIL curled around left ──────────────────
+  B(1, 20, 3, 9, O);    // tail left side
+  B(1, 19, 4, 2, O);    // tail top
+  B(1, 27, 3, 3, OL);   // tail tip
+  B(1, 22, 3, 2, S);    B(1, 26, 3, 2, S);   // tail stripes
+  B(1, 19, 1, 11, K);   // tail outer outline
+
+  // ── HEAD ────────────────────────────────────
+  // Head resting on body, slightly tilted left
+  // positioned at left side, resting forward
+  B(4, 11, 20, 12, O);    // head
+  B(4, 11, 20, 2, OD);    // top darker
+  // head outline
+  B(4, 11, 20, 1, K); B(4, 22, 20, 1, K);
+  B(4, 11, 1, 11, K); B(23,11, 1, 11, K);
+
+  // ears on sleeping head
+  B(6, 8, 2, 3, O);  B(5, 9, 4, 3, O);  B(6, 9, 2, 2, Pk);  // left ear
+  B(5, 8, 1, 4, K); B(8, 9, 1, 3, K);   B(6, 8, 2, 1, K);   // left ear outline
+  B(18,8, 2, 3, O);  B(17,9, 4, 3, O);  B(18,9, 2, 2, Pk);  // right ear
+  B(17,9, 1, 3, K);  B(19,8, 1, 4, K);  B(18,8, 2, 1, K);   // right ear outline
+
+  // M stripe
+  B(8,  11, 2, 4, S);
+  B(11, 11, 4, 2, S);
+  B(17, 11, 2, 4, S);
+  B(13, 11, 4, 2, O);    // M gap
+
+  // cheeks
+  B(4, 16, 5, 4, OL);    B(19, 16, 5, 4, OL);
+  B(4, 17, 4, 2, S);     B(20, 17, 4, 2, S);    // cheek stripes
+
+  // muzzle
+  B(9, 16, 10, 5, OL);
+
+  // EYES CLOSED (sleeping — cute curved lines)
+  B(7,  15, 6, 1, K);    // left eye bottom
+  B(8,  14, 4, 1, K);    // left eye arc
+  B(17, 15, 6, 1, K);    // right eye bottom
+  B(17, 14, 4, 1, K);    // right eye arc
+  // little zzz sparkle dots near eyes
+  const sp = Math.sin(phase * 0.004);
+  if (sp > 0) {
+    cx.fillStyle = '#aaaaff'; cx.globalAlpha = sp * 0.7;
+    cx.fillRect(12*GS, 12*GS, GS, GS);
+    cx.fillRect(14*GS, 11*GS, GS, GS);
+    cx.globalAlpha = 1;
+  }
+
+  // nose
+  B(13, 17, 4, 2, Ns);
+  B(14, 17, 2, 1, Pk);
+  B(13, 17, 4, 1, K);
+  B(13, 18, 1, 1, K); B(16, 18, 1, 1, K);
+
+  // mouth
+  B(14, 19, 2, 1, K);
+  B(12, 20, 3, 1, K);
+  B(15, 20, 3, 1, K);
+
+  // whiskers
+  LINE(9, 17.5, 2, 16.5, W);
+  LINE(9, 18.5, 2, 18.5, W);
+  LINE(9, 19.5, 2, 20.5, W);
+  LINE(19, 17.5, 26, 16.5, W);
+  LINE(19, 18.5, 26, 18.5, W);
+  LINE(19, 19.5, 26, 20.5, W);
+}
+
+// ═══════════════════════════════════════════════
+//  STARFIELD
+// ═══════════════════════════════════════════════
+const bgc = document.getElementById('bg');
+const bctx = bgc.getContext('2d');
 function buildStars() {
-  bg.width = window.innerWidth;
-  bg.height = window.innerHeight;
-  bctx.clearRect(0,0,bg.width,bg.height);
+  bgc.width = window.innerWidth; bgc.height = window.innerHeight;
+  bctx.clearRect(0, 0, bgc.width, bgc.height);
   for (let i = 0; i < 100; i++) {
-    const x = Math.random()*bg.width, y = Math.random()*bg.height;
-    const r = 0.5 + Math.random()*1.5;
+    const x = Math.random()*bgc.width, y = Math.random()*bgc.height;
     bctx.beginPath();
-    bctx.arc(x, y, r, 0, Math.PI*2);
+    bctx.arc(x, y, 0.5+Math.random()*1.5, 0, Math.PI*2);
     bctx.fillStyle = `rgba(${180+Math.random()*75|0},${180+Math.random()*75|0},255,${0.2+Math.random()*0.7})`;
     bctx.fill();
   }
@@ -148,72 +413,55 @@ function buildStars() {
 buildStars();
 window.addEventListener('resize', buildStars);
 
-// ─────────────────────────────────────────────────────
-// FX CANVAS (hearts + zzz)
-// ─────────────────────────────────────────────────────
-const fx = document.getElementById('fx');
-const fctx = fx.getContext('2d');
-function resizeFx() { fx.width = window.innerWidth; fx.height = window.innerHeight; }
+// ═══════════════════════════════════════════════
+//  FX (hearts + zzz)
+// ═══════════════════════════════════════════════
+const fxc = document.getElementById('fx');
+const fctx = fxc.getContext('2d');
+function resizeFx() { fxc.width = window.innerWidth; fxc.height = window.innerHeight; }
 resizeFx();
 window.addEventListener('resize', resizeFx);
 
 const particles = [];
 function spawnHearts(x, y) {
-  for (let i = 0; i < 5; i++) {
-    particles.push({
-      type: 'heart',
-      x: x + (Math.random()-.5)*80,
-      y, vy: -(1.5+Math.random()*2.5),
-      vx: (Math.random()-.5)*2,
-      size: 10+Math.random()*14,
-      alpha: 1,
-      hue: Math.random()*40-20
-    });
-  }
+  for (let i = 0; i < 6; i++)
+    particles.push({ type: 'heart', x: x+(Math.random()-.5)*80, y,
+      vy: -(1.5+Math.random()*2.5), vx: (Math.random()-.5)*2.5,
+      size: 10+Math.random()*14, alpha: 1, hue: Math.random()*40-20 });
 }
 function spawnZzz() {
-  const rect = C.getBoundingClientRect();
-  particles.push({
-    type: 'zzz',
-    x: rect.right - SIZE * 0.15,
-    y: rect.top + SIZE * 0.28,
-    text: Math.random() < .5 ? 'z' : 'Z',
-    vy: -(0.5+Math.random()*0.7),
-    vx: 0.4+Math.random()*0.6,
-    size: 9+Math.floor(Math.random()*10),
-    alpha: 1
-  });
+  const r = cv.getBoundingClientRect();
+  particles.push({ type: 'zzz', x: r.right-10, y: r.top+r.height*0.3,
+    text: Math.random()<.5 ? 'z' : 'Z', vy: -(0.5+Math.random()*.6),
+    vx: 0.4+Math.random()*.6, size: 9+Math.floor(Math.random()*10), alpha: 1 });
 }
-
-function drawHeart(ctx, x, y, s, alpha, hue) {
+function drawPixelHeart(ctx, x, y, s, alpha, hue) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = `hsl(${340+hue},100%,72%)`;
-  ctx.shadowColor = `hsl(${340+hue},100%,80%)`;
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = `hsl(${340+hue},100%,80%)`; ctx.shadowBlur = 8;
   ctx.translate(x, y);
-  ctx.beginPath();
-  ctx.moveTo(0, s*0.3);
-  ctx.bezierCurveTo(-s*0.5, -s*0.3, -s, s*0.1, 0, s*0.9);
-  ctx.bezierCurveTo(s, s*0.1, s*0.5, -s*0.3, 0, s*0.3);
-  ctx.fill();
+  // pixel-style heart using rects
+  const p = s/4;
+  ctx.fillRect(-p*2, -p, p, p); ctx.fillRect(p, -p, p, p);         // top bumps
+  ctx.fillRect(-p*3, 0, p*6, p);                                     // wide mid
+  ctx.fillRect(-p*2, p, p*4, p);                                     // lower mid
+  ctx.fillRect(-p, p*2, p*2, p);                                     // bottom
   ctx.restore();
 }
-
 function tickParticles() {
-  fctx.clearRect(0,0,fx.width,fx.height);
+  fctx.clearRect(0, 0, fxc.width, fxc.height);
   for (let i = particles.length-1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy; p.alpha -= 0.015;
     if (p.alpha <= 0) { particles.splice(i,1); continue; }
     if (p.type === 'heart') {
-      drawHeart(fctx, p.x, p.y, p.size, p.alpha, p.hue);
+      drawPixelHeart(fctx, p.x, p.y, p.size, p.alpha, p.hue);
     } else {
       fctx.save();
       fctx.globalAlpha = p.alpha;
       fctx.fillStyle = '#aaaaff';
-      fctx.shadowColor = '#6677ff';
-      fctx.shadowBlur = 8;
+      fctx.shadowColor = '#6677ff'; fctx.shadowBlur = 8;
       fctx.font = `${p.size}px 'Press Start 2P', monospace`;
       fctx.fillText(p.text, p.x, p.y);
       fctx.restore();
@@ -221,627 +469,89 @@ function tickParticles() {
   }
 }
 
-// ─────────────────────────────────────────────────────
-// CAT DRAWING
-// ─────────────────────────────────────────────────────
-const S = SIZE;
-const cx = S * 0.5;  // center x
-
-// Colors
-const FUR     = '#F5A742';
-const FUR_D   = '#D4843A';
-const FUR_L   = '#FFCF85';
-const STRIPE  = '#C06820';
-const WHITE   = '#FFF5E8';
-const PINK    = '#FFB0CC';
-const NOSE    = '#FF6699';
-const OUTLINE = '#2a1a0e';
-const EYE_G   = '#44DD77';
-const EYE_P   = '#003318';
-const EYE_SH  = 'rgba(255,255,255,0.7)';
-const MOUTH   = '#6a3010';
-
-function px(n)  { return n * S; }   // proportion → pixels
-
-// helper: rounded rect
-function rrect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
-}
-
-// ── BODY ──
-function drawBody(bounce) {
-  const by = px(0.56) + bounce;
-  // shadow
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, px(0.92), px(0.22), px(0.04), 0, 0, Math.PI*2);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fill();
-  ctx.restore();
-
-  // body blob
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, by, px(0.22), px(0.24), 0, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.018);
-  ctx.stroke();
-  ctx.restore();
-
-  // belly highlight
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, by + px(0.03), px(0.12), px(0.15), 0, 0, Math.PI*2);
-  ctx.fillStyle = WHITE;
-  ctx.globalAlpha = 0.55;
-  ctx.fill();
-  ctx.restore();
-
-  // stripes
-  for (let i = 0; i < 2; i++) {
-    const sy = by - px(0.08) + i * px(0.09);
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(cx, sy, px(0.17), px(0.03), 0, 0, Math.PI*2);
-    ctx.fillStyle = STRIPE;
-    ctx.globalAlpha = 0.4;
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-// ── TAIL ──
-function drawTail(phase) {
-  const swing = Math.sin(phase) * px(0.08);
-  ctx.save();
-  ctx.strokeStyle = FUR;
-  ctx.lineWidth = px(0.07);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.shadowColor = OUTLINE;
-  ctx.shadowBlur = 3;
-  ctx.beginPath();
-  ctx.moveTo(cx + px(0.18), px(0.73));
-  ctx.bezierCurveTo(
-    cx + px(0.38), px(0.78),
-    cx + px(0.42) + swing, px(0.60),
-    cx + px(0.28) + swing, px(0.50)
-  );
-  ctx.stroke();
-  // tip
-  ctx.beginPath();
-  ctx.arc(cx + px(0.28) + swing, px(0.50), px(0.045), 0, Math.PI*2);
-  ctx.fillStyle = FUR_L;
-  ctx.fill();
-  ctx.restore();
-}
-
-// ── PAWS ──
-function drawPaws(bounce) {
-  const py2 = px(0.80) + bounce;
-  // left paw
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx - px(0.12), py2, px(0.07), px(0.045), 0, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.015);
-  ctx.stroke();
-  ctx.restore();
-  // left toe beans
-  for (let j = -1; j <= 1; j++) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx - px(0.12) + j*px(0.025), py2 + px(0.015), px(0.012), 0, Math.PI*2);
-    ctx.fillStyle = PINK;
-    ctx.globalAlpha = 0.8;
-    ctx.fill();
-    ctx.restore();
-  }
-  // right paw
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx + px(0.12), py2, px(0.07), px(0.045), 0, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.015);
-  ctx.stroke();
-  ctx.restore();
-  for (let j = -1; j <= 1; j++) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx + px(0.12) + j*px(0.025), py2 + px(0.015), px(0.012), 0, Math.PI*2);
-    ctx.fillStyle = PINK;
-    ctx.globalAlpha = 0.8;
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-// ── HEAD ──
-function drawHead(bounce, blinkT, isSleeping) {
-  const hy = px(0.30) + bounce;
-
-  // head base
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, hy, px(0.26), px(0.24), 0, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.018);
-  ctx.stroke();
-  ctx.restore();
-
-  // cheek blush
-  for (const side of [-1,1]) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(cx + side*px(0.19), hy + px(0.05), px(0.06), px(0.03), 0, 0, Math.PI*2);
-    ctx.fillStyle = '#FFAACC';
-    ctx.globalAlpha = 0.35;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // ears
-  for (const side of [-1,1]) {
-    const ex = cx + side*px(0.16);
-    const ey = hy - px(0.20);
-    // outer
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(ex - side*px(0.01), ey + px(0.14));
-    ctx.lineTo(ex - side*px(0.12), ey - px(0.08));
-    ctx.lineTo(ex + side*px(0.09), ey + px(0.02));
-    ctx.closePath();
-    ctx.fillStyle = FUR;
-    ctx.fill();
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = px(0.016);
-    ctx.stroke();
-    ctx.restore();
-    // inner pink
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(ex - side*px(0.005), ey + px(0.08));
-    ctx.lineTo(ex - side*px(0.07), ey - px(0.02));
-    ctx.lineTo(ex + side*px(0.04), ey + px(0.04));
-    ctx.closePath();
-    ctx.fillStyle = PINK;
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // forehead stripe
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, hy - px(0.12), px(0.07), px(0.025), 0, 0, Math.PI*2);
-  ctx.fillStyle = STRIPE;
-  ctx.globalAlpha = 0.5;
-  ctx.fill();
-  ctx.restore();
-
-  // EYES
-  const eyeY = hy + px(0.01);
-  const eyeRx = px(0.26) * 0.42;
-
-  if (isSleeping || blinkT > 0.5) {
-    // closed / sleeping eyes — cute curved lines
-    for (const side of [-1,1]) {
-      const ex = cx + side * eyeRx;
-      ctx.save();
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = px(0.022);
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(ex, eyeY + px(0.01), px(0.055), Math.PI, 0, false);
-      ctx.stroke();
-      // little lash
-      ctx.beginPath();
-      ctx.moveTo(ex + side*px(0.04), eyeY + px(0.01));
-      ctx.lineTo(ex + side*px(0.065), eyeY - px(0.02));
-      ctx.stroke();
-      ctx.restore();
-    }
-    if (isSleeping) {
-      // sleeping sparkle
-      ctx.save();
-      ctx.fillStyle = '#bbbbff';
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(cx - px(0.06), eyeY + px(0.03), px(0.012), 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-  } else {
-    // open eyes
-    for (const side of [-1,1]) {
-      const ex = cx + side * eyeRx;
-      // white sclera
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(ex, eyeY, px(0.068), px(0.072), 0, 0, Math.PI*2);
-      ctx.fillStyle = WHITE;
-      ctx.fill();
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = px(0.016);
-      ctx.stroke();
-      ctx.restore();
-      // iris
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(ex, eyeY, px(0.044), px(0.052), 0, 0, Math.PI*2);
-      ctx.fillStyle = EYE_G;
-      ctx.fill();
-      ctx.restore();
-      // pupil
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(ex, eyeY, px(0.022), px(0.038), 0, 0, Math.PI*2);
-      ctx.fillStyle = EYE_P;
-      ctx.fill();
-      ctx.restore();
-      // shine
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(ex - px(0.012), eyeY - px(0.016), px(0.014), px(0.018), -0.4, 0, Math.PI*2);
-      ctx.fillStyle = EYE_SH;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  // nose
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(cx, hy + px(0.09));
-  ctx.bezierCurveTo(cx - px(0.025), hy + px(0.07), cx + px(0.025), hy + px(0.07), cx, hy + px(0.09));
-  ctx.lineTo(cx - px(0.018), hy + px(0.065));
-  ctx.bezierCurveTo(cx - px(0.03), hy + px(0.055), cx + px(0.03), hy + px(0.055), cx + px(0.018), hy + px(0.065));
-  ctx.closePath();
-  ctx.fillStyle = NOSE;
-  ctx.fill();
-  ctx.restore();
-
-  // mouth
-  ctx.save();
-  ctx.strokeStyle = MOUTH;
-  ctx.lineWidth = px(0.016);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx, hy + px(0.096));
-  ctx.lineTo(cx, hy + px(0.115));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx, hy + px(0.115));
-  ctx.bezierCurveTo(cx - px(0.01), hy + px(0.13), cx - px(0.04), hy + px(0.135), cx - px(0.055), hy + px(0.125));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx, hy + px(0.115));
-  ctx.bezierCurveTo(cx + px(0.01), hy + px(0.13), cx + px(0.04), hy + px(0.135), cx + px(0.055), hy + px(0.125));
-  ctx.stroke();
-  ctx.restore();
-
-  // whiskers
-  ctx.save();
-  ctx.strokeStyle = WHITE;
-  ctx.lineWidth = px(0.012);
-  ctx.globalAlpha = 0.85;
-  ctx.lineCap = 'round';
-  for (const side of [-1,1]) {
-    const wx = cx + side * px(0.04);
-    const wy = hy + px(0.07);
-    for (let w = 0; w < 3; w++) {
-      const wo = (w - 1) * px(0.025);
-      ctx.beginPath();
-      ctx.moveTo(wx, wy + wo);
-      ctx.lineTo(wx + side * px(0.18), wy + wo + side * px(0.01) * (w-1));
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
-}
-
-// ── SLEEPING CURLED BODY ──
-function drawCurledBody(phase) {
-  const breathe = Math.sin(phase * 0.5) * px(0.008);
-
-  // shadow
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, px(0.88), px(0.30), px(0.04), 0, 0, Math.PI*2);
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fill();
-  ctx.restore();
-
-  // curled body
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx + px(0.02), px(0.68) + breathe, px(0.28), px(0.18), 0.15, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.018);
-  ctx.stroke();
-  ctx.restore();
-
-  // belly
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx + px(0.02), px(0.70) + breathe, px(0.16), px(0.10), 0.1, 0, Math.PI*2);
-  ctx.fillStyle = WHITE;
-  ctx.globalAlpha = 0.5;
-  ctx.fill();
-  ctx.restore();
-
-  // sleeping tail wraps around
-  ctx.save();
-  ctx.strokeStyle = FUR;
-  ctx.lineWidth = px(0.07);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx - px(0.22), px(0.72) + breathe);
-  ctx.bezierCurveTo(
-    cx - px(0.38), px(0.78),
-    cx - px(0.38), px(0.56),
-    cx - px(0.15), px(0.53) + breathe
-  );
-  ctx.stroke();
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx - px(0.15), px(0.53) + breathe, px(0.04), 0, Math.PI*2);
-  ctx.fillStyle = FUR_L;
-  ctx.fill();
-  ctx.restore();
-  ctx.restore();
-
-  // tucked paws
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx + px(0.08), px(0.82) + breathe, px(0.12), px(0.04), 0.2, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.014);
-  ctx.stroke();
-  ctx.restore();
-  // paw toe beans
-  for (let j = -1; j <= 1; j++) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx + px(0.10) + j*px(0.03), px(0.84) + breathe, px(0.011), 0, Math.PI*2);
-    ctx.fillStyle = PINK;
-    ctx.globalAlpha = 0.8;
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-// ── SLEEPING HEAD ──
-function drawSleepingHead(phase) {
-  const breathe = Math.sin(phase * 0.5) * px(0.008);
-  const hy = px(0.50) + breathe;
-  drawHead(hy - px(0.30), 1.0, true); // reuse head at lower position w/ sleeping=true
-}
-
-// ─────────────────────────────────────────────────────
-// ANIMATION STATE
-// ─────────────────────────────────────────────────────
-let sleeping = false;
-let phase = 0;
-let blinkPhase = 0;
-let blinkTimer = 0;
-let blinkInterval = 3500 + Math.random() * 2000;
-let zzzTimer2 = 0;
-let lastInteraction = Date.now();
-let lastTs = 0;
-let bounceAmt = 0;
+// ═══════════════════════════════════════════════
+//  ANIMATION STATE
+// ═══════════════════════════════════════════════
+let sleeping      = false;
+let phase         = 0;
+let blinkTimer    = 0;
+let blinkInterval = 3000 + Math.random()*2500;
+let blinkState    = 0;   // 0 open, 1 half, 2 closed
+let tailPhase     = 0;
+let zzzTick       = 0;
+let lastInteract  = Date.now();
+let lastTs        = 0;
 
 const modeLabel = document.getElementById('mode-label');
 
-function setMode(isSleeping) {
-  sleeping = isSleeping;
-  if (isSleeping) {
+function setMode(isSleep) {
+  sleeping = isSleep;
+  if (isSleep) {
     modeLabel.textContent = '💤 SLEEPING 💤';
     modeLabel.classList.add('sleeping');
   } else {
     modeLabel.textContent = '♥ IDLE ♥';
     modeLabel.classList.remove('sleeping');
-    blinkTimer = 0;
+    blinkTimer = 0; blinkState = 0;
   }
 }
 
-function render(dt) {
-  phase += dt * 0.003;
-  ctx.clearRect(0, 0, S, S);
-
-  if (sleeping) {
-    // sleeping pose
-    const breathe = Math.sin(phase * 0.5) * px(0.008);
-    drawCurledBody(phase);
-
-    // head sits on top of curled body
-    const hy = px(0.47) + breathe;
-    // shadow under head
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(cx + px(0.04), hy + px(0.22), px(0.18), px(0.025), 0, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fill();
-    ctx.restore();
-    // head at sleep position
-    const savedTx = ctx.getTransform();
-    ctx.save();
-    ctx.translate(px(0.04), hy - px(0.30));  // shift down from normal
-    // nudge: just draw head inline
-    ctx.restore();
-    // inline head draw at sleep pos
-    drawSleepHead(hy, phase);
-  } else {
-    // idle — gentle bob
-    const bounce = Math.sin(phase) * px(0.012);
-    const tailPhase = phase * 1.2;
-    drawTail(tailPhase);
-    drawBody(bounce);
-    drawPaws(bounce);
-
-    // blink logic
-    blinkTimer += dt;
-    let blinkT = 0;
-    if (blinkTimer > blinkInterval) {
-      const bt = (blinkTimer - blinkInterval);
-      blinkT = bt < 120 ? bt / 120 : bt < 200 ? 1 : bt < 320 ? (320 - bt) / 120 : 0;
-      if (blinkTimer > blinkInterval + 320) {
-        blinkTimer = 0;
-        blinkInterval = 3000 + Math.random() * 3000;
-      }
-    }
-    drawHead(bounce, blinkT, false);
-  }
-}
-
-function drawSleepHead(hy, ph) {
-  const breathe = Math.sin(ph * 0.5) * px(0.008);
-  const hcx = cx + px(0.04);
-
-  // head tilt
-  ctx.save();
-  ctx.translate(hcx, hy);
-  ctx.rotate(0.25);
-
-  // head circle
-  ctx.beginPath();
-  ctx.ellipse(0, 0, px(0.24), px(0.22), 0, 0, Math.PI*2);
-  ctx.fillStyle = FUR;
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = px(0.018);
-  ctx.stroke();
-
-  // cheek blush
-  for (const side of [-1,1]) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(side*px(0.17), px(0.04), px(0.055), px(0.028), 0, 0, Math.PI*2);
-    ctx.fillStyle = '#FFAACC';
-    ctx.globalAlpha = 0.35;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // ears
-  for (const side of [-1,1]) {
-    const ex = side * px(0.14);
-    const ey = -px(0.19);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(ex - side*px(0.01), ey + px(0.13));
-    ctx.lineTo(ex - side*px(0.11), ey - px(0.07));
-    ctx.lineTo(ex + side*px(0.08), ey + px(0.01));
-    ctx.closePath();
-    ctx.fillStyle = FUR;
-    ctx.fill();
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = px(0.016);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(ex - side*px(0.005), ey + px(0.07));
-    ctx.lineTo(ex - side*px(0.065), ey - px(0.01));
-    ctx.lineTo(ex + side*px(0.035), ey + px(0.03));
-    ctx.closePath();
-    ctx.fillStyle = PINK;
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // closed eyes — cute curved
-  const eyeY = px(0.01);
-  const eyeRx = px(0.24) * 0.42;
-  for (const side of [-1,1]) {
-    const ex = side * eyeRx;
-    ctx.save();
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = px(0.022);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(ex, eyeY, px(0.052), Math.PI, 0, false);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // nose
-  ctx.save();
-  ctx.fillStyle = NOSE;
-  ctx.beginPath();
-  ctx.moveTo(0, px(0.085));
-  ctx.lineTo(-px(0.017), px(0.065));
-  ctx.bezierCurveTo(-px(0.028), px(0.052), px(0.028), px(0.052), px(0.017), px(0.065));
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // whiskers
-  ctx.save();
-  ctx.strokeStyle = WHITE;
-  ctx.lineWidth = px(0.011);
-  ctx.globalAlpha = 0.8;
-  ctx.lineCap = 'round';
-  for (const side of [-1,1]) {
-    for (let w = 0; w < 3; w++) {
-      const wo = (w-1)*px(0.022);
-      ctx.beginPath();
-      ctx.moveTo(side*px(0.03), px(0.065)+wo);
-      ctx.lineTo(side*px(0.19), px(0.065)+wo + side*px(0.01)*(w-1));
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
-
-  ctx.restore(); // end rotate/translate
-}
-
-// ─────────────────────────────────────────────────────
-// LOOP
-// ─────────────────────────────────────────────────────
-let zzzTick = 0;
 function loop(ts) {
   requestAnimationFrame(loop);
   const dt = Math.min(ts - lastTs, 50);
   lastTs = ts;
+  phase += dt;
 
-  if (!sleeping && Date.now() - lastInteraction > 10000) setMode(true);
+  if (!sleeping && Date.now() - lastInteract > 10000) setMode(true);
 
   if (sleeping) {
     zzzTick += dt;
-    if (zzzTick > 1200) { zzzTick = 0; spawnZzz(); }
+    if (zzzTick > 1300) { zzzTick = 0; spawnZzz(); }
+    drawSleep(phase);
+  } else {
+    // bob: 0 or 1 (slow, round)
+    const bob = Math.floor(phase / 500) % 2;
+
+    // tail: wag slowly -1, 0, +1
+    tailPhase += dt;
+    const tailDx = Math.round(Math.sin(tailPhase * 0.0015) * 1);
+
+    // blink logic
+    blinkTimer += dt;
+    if (blinkTimer > blinkInterval) {
+      const bt = blinkTimer - blinkInterval;
+      if (bt < 100)       blinkState = 1;
+      else if (bt < 200)  blinkState = 2;
+      else if (bt < 300)  blinkState = 1;
+      else {
+        blinkState = 0;
+        blinkTimer = 0;
+        blinkInterval = 2800 + Math.random()*3000;
+      }
+    } else {
+      blinkState = 0;
+    }
+
+    drawIdle(bob, blinkState, tailDx);
   }
 
-  render(dt);
   tickParticles();
 }
 
-// ─────────────────────────────────────────────────────
-// INPUT
-// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════
 function onInteract(e) {
-  lastInteraction = Date.now();
+  lastInteract = Date.now();
   if (sleeping) setMode(false);
   let x, y;
   if (e.touches) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
-  else { x = e.clientX; y = e.clientY; }
+  else           { x = e.clientX;             y = e.clientY; }
   spawnHearts(x, y);
 }
-document.addEventListener('click', onInteract);
+document.addEventListener('click',      onInteract);
 document.addEventListener('touchstart', onInteract, { passive: true });
-document.addEventListener('mousemove', () => lastInteraction = Date.now());
+document.addEventListener('mousemove',  () => lastInteract = Date.now());
 
 requestAnimationFrame(loop);
 </script>
