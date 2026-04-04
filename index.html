@@ -30,41 +30,40 @@
       padding: 16px;
     }
     .title {
-      color: #ff88ff;
+      color: #ffaaee;
       font-size: clamp(7px, 3vw, 13px);
-      text-shadow: 0 0 12px #ff44ff, 2px 2px 0 #440044;
+      text-shadow: 0 0 14px #ff66dd, 2px 2px 0 #550033;
       letter-spacing: 4px;
     }
     .screen {
       position: relative;
       background: radial-gradient(ellipse at 50% 30%, #1a1a3a 0%, #060812 100%);
-      border-radius: 16px; padding: 5px;
+      border-radius: 20px; padding: 6px;
       box-shadow:
-        0 0 0 3px #2a2a5a, 0 0 0 6px #111128,
-        0 0 50px #4422aa55, 0 0 100px #221155aa,
+        0 0 0 3px #2a2a5a, 0 0 0 7px #111128,
+        0 0 60px #6633cc44, 0 0 120px #331166aa,
         inset 0 0 40px #00000077;
     }
     .screen-inner {
-      position: relative; border-radius: 10px;
+      position: relative; border-radius: 13px;
       overflow: hidden; background: #07071a;
     }
     .screen-inner::after {
       content: ''; position: absolute; inset: 0;
       background: repeating-linear-gradient(0deg,
         transparent 0, transparent 3px,
-        rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px);
-      pointer-events: none; z-index: 10; border-radius: 10px;
+        rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px);
+      pointer-events: none; z-index: 10; border-radius: 13px;
     }
     .screen-inner::before {
-      content: ''; position: absolute;
-      top: 0; left: 5%; right: 5%; height: 40%;
-      background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 70%);
+      content: ''; position: absolute; top:0; left:5%; right:5%; height:40%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 70%);
       pointer-events: none; z-index: 11;
     }
     #cat { display: block; }
     #mode-label {
       font-size: clamp(6px, 2.2vw, 10px);
-      color: #88ff88; text-shadow: 0 0 8px #44ff44;
+      color: #ffaadd; text-shadow: 0 0 8px #ff66bb;
       letter-spacing: 2px; transition: color .8s, text-shadow .8s;
     }
     #mode-label.sleeping { color: #aaaaff; text-shadow: 0 0 10px #6666ff; }
@@ -84,12 +83,12 @@
   <div id="hint-label">TAP TO PET &#9733; SLEEPS AFTER 10S</div>
 </div>
 <script>
-// ═══════════════════════════════════════════
-//  GRID — 24×32 pixels, scaled up
-// ═══════════════════════════════════════════
-const GW = 24, GH = 32;
-const GS = Math.max(7, Math.min(13,
-  Math.floor(Math.min(window.innerWidth * 0.78, window.innerHeight * 0.60) / GH)
+// ══════════════════════════════════════════════════
+//  GRID  — 22 cols × 28 rows
+// ══════════════════════════════════════════════════
+const GW = 22, GH = 28;
+const GS = Math.max(9, Math.min(14,
+  Math.floor(Math.min(window.innerWidth * 0.82, window.innerHeight * 0.58) / GH)
 ));
 
 const cv = document.getElementById('cat');
@@ -98,424 +97,510 @@ cv.height = GH * GS;
 const cx = cv.getContext('2d');
 cx.imageSmoothingEnabled = false;
 
-// ═══════════════════════════════════════════
-//  PALETTE
-// ═══════════════════════════════════════════
-const _ = null;        // transparent
-const K = '#1C0A00';   // outline
-const O = '#F4A636';   // base orange fur
-const H = '#FFD080';   // highlight fur
-const D = '#C47820';   // shadow fur
-const T = '#8B4513';   // tabby stripe
-const W = '#FFF5E8';   // white (muzzle/belly)
-const P = '#FFB8D0';   // pink (ear inner)
-const N = '#FF5588';   // nose
-const G = '#22CC55';   // eye iris green
-const E = '#003310';   // eye pupil
-const L = '#FFFFFF';   // eye highlight
-const B = '#FFEEAA';   // whisker
+// ══════════════════════════════════════════════════
+//  PALETTE  — warm, Ghibli-soft
+// ══════════════════════════════════════════════════
+const K  = '#2E1200';   // warm dark brown outline (not pure black)
+const O  = '#F0A030';   // pumpkin orange base
+const H  = '#FFD888';   // warm cream highlight
+const D  = '#C07018';   // amber shadow
+const T  = '#B06820';   // subtle tabby stripe
+const W  = '#FFF8F0';   // warm white (muzzle/belly)
+const P  = '#FFAABB';   // rose pink (ears, blush)
+const N  = '#FF5577';   // soft nose
+const EW = '#FFFCE8';   // eye white (warm)
+const EG = '#33CC77';   // eye green iris
+const ED = '#003A18';   // eye dark pupil
+const EH = '#FFFFFF';   // eye highlight 1
+const Eh = '#CCFFEE';   // eye highlight 2 (soft)
+const BL = '#FFD0E0';   // cheek blush
 
-// ═══════════════════════════════════════════
-//  SPRITE DATA — each frame is a 24×32 array
-//  Row 0 = top of canvas
-// ═══════════════════════════════════════════
-
-// Helper: build a frame from a compact string grid
-// Each char maps to a color. Space = transparent.
-// We define frame data as arrays of [x,y,w,h,color] rects — cleaner than full grids.
-
-function makeFrame(rects) {
-  // rects: array of [x, y, w, h, color]
-  const grid = [];
-  for (let r = 0; r < GH; r++) { grid.push([]); for (let c = 0; c < GW; c++) grid[r].push(_); }
-  for (const [x, y, w, h, col] of rects) {
-    for (let dy = 0; dy < h; dy++)
-      for (let dx = 0; dx < w; dx++)
-        if (y+dy < GH && x+dx < GW) grid[y+dy][x+dx] = col;
-  }
-  return grid;
+// ══════════════════════════════════════════════════
+//  RENDERER
+// ══════════════════════════════════════════════════
+// p(x, y, w, h, color)
+function p(x, y, w, h, c) {
+  if (!c) return;
+  cx.fillStyle = c;
+  cx.fillRect(x * GS, y * GS, w * GS, h * GS);
 }
-
-// ── Shared parts (used across multiple frames) ──
-
-// HEAD (centered at cols 2–21, rows 1–12)
-// Big round head — we fake round corners with single outline pixels
-const HEAD = (earY=0) => [
-  // ears
-  [3,  0+earY, 3, 1, K], [3, 0+earY, 3, 3, O], [4, 1+earY, 1, 2, P],   // left ear
-  [18, 0+earY, 3, 1, K], [18,0+earY, 3, 3, O], [19,1+earY, 1, 2, P],   // right ear
-  // ear outlines
-  [2,  1+earY, 1, 3, K], [5, 1+earY, 1, 3, K],                          // left sides
-  [17, 1+earY, 1, 3, K], [20,1+earY, 1, 3, K],                          // right sides
-
-  // head base — rounded rect: skip corners
-  [2,  3, 20, 10, O],     // main head block
-  // round top corners
-  [2,  3, 1,  1,  _],  [21, 3, 1, 1, _],   // top corners cut
-  [2,  12,1,  1,  _],  [21,12, 1, 1, _],   // bottom corners cut
-  // outline
-  [2,  3, 20, 1, K],   // top
-  [2, 12, 20, 1, K],   // bottom
-  [2,  3,  1,10, K],   // left
-  [21, 3,  1,10, K],   // right
-
-  // forehead highlight
-  [6, 4, 12, 2, H],
-
-  // tabby M — proper M on forehead
-  // left V of M
-  [4,  4, 2, 1, T], [4, 5, 2, 2, T], [5, 6, 2, 2, T],
-  // right V of M  
-  [18, 4, 2, 1, T], [18,5, 2, 2, T], [17,6, 2, 2, T],
-  // center peak of M
-  [11, 4, 2, 2, T], [10, 5, 4, 1, T],
-
-  // cheek patches (lighter)
-  [2, 8, 4, 3, H],  [18, 8, 4, 3, H],
-  // cheek stripes
-  [2, 9, 4, 1, T],  [18, 9, 4, 1, T],
-
-  // muzzle (white blob)
-  [6, 9, 12, 4, W],
-  [5, 10, 14, 2, W],  // slightly wider mid
-  // muzzle top curve
-  [6,  9, 1, 1, O], [17, 9, 1, 1, O],
-
-  // nose
-  [10,10, 4, 2, N], [11,10, 2, 1, P],  // top lighter
-  [10,10, 4, 1, K],                     // nose top outline
-  [10,11, 1, 1, K], [13,11, 1, 1, K],  // sides
-
-  // mouth
-  [11,12, 2, 1, K],         // center
-  [8, 13, 3, 1, K],         // left curve
-  [13,13, 3, 1, K],         // right curve
-];
-
-// EYES open
-const EYES_OPEN = [
-  // left eye
-  [5,  6, 6, 5, W],           // white
-  [6,  6, 4, 5, G],           // iris
-  [7,  7, 2, 4, E],           // pupil (tall)
-  [6,  6, 1, 2, L],           // highlight
-  // outline
-  [5,  6, 6, 1, K], [5, 10, 6, 1, K],
-  [5,  6, 1, 5, K], [10, 6, 1, 5, K],
-  // right eye
-  [13, 6, 6, 5, W],
-  [14, 6, 4, 5, G],
-  [15, 7, 2, 4, E],
-  [14, 6, 1, 2, L],
-  [13, 6, 6, 1, K], [13,10, 6, 1, K],
-  [13, 6, 1, 5, K], [18, 6, 1, 5, K],
-];
-
-// EYES half-blink
-const EYES_HALF = [
-  [5,  8, 6, 3, W], [6, 8, 4, 3, G], [7, 9, 2, 2, E],
-  [13, 8, 6, 3, W], [14,8, 4, 3, G], [15,9, 2, 2, E],
-  [5,  8, 6, 1, K], [5,10, 6, 1, K],
-  [13, 8, 6, 1, K], [13,10,6, 1, K],
-];
-
-// EYES closed (cute squint line)
-const EYES_CLOSED = [
-  [5, 9, 6, 1, K], [6, 8, 4, 1, K],    // left arc
-  [13,9, 6, 1, K], [13,8, 4, 1, K],    // right arc (slight tilt up = cute)
-];
-
-// EYES happy (^ ^ shape when pet)
-const EYES_HAPPY = [
-  [6, 8, 4, 1, K], [5, 9, 2, 1, K], [9, 9, 2, 1, K],    // left ^
-  [14,8, 4, 1, K], [13,9, 2, 1, K], [17,9, 2, 1, K],    // right ^
-  // blush under eyes
-  [4, 10, 3, 1, '#FFAACC'], [17,10, 3, 1, '#FFAACC'],
-];
-
-// BODY sitting (rows 13–25)
-const BODY = (bob=0) => [
-  // shadow
-  [5, 26+bob, 14, 1, 'rgba(0,0,0,0.2)'],
-  // body blob
-  [4, 13+bob, 16, 12, O],
-  [3, 15+bob, 18, 8,  O],   // wider mid
-  // round body corners
-  [3, 13+bob, 1, 1, _], [19,13+bob, 1, 1, _],
-  [3, 24+bob, 1, 1, _], [19,24+bob, 1, 1, _],
-  // belly white
-  [6, 15+bob, 12, 8, W],
-  [5, 16+bob, 14, 6, W],
-  // body stripes
-  [4, 15+bob, 16, 2, T], [7, 15+bob, 10, 2, D],  // stripe 1
-  [4, 19+bob, 16, 2, T], [7, 19+bob, 10, 2, D],  // stripe 2
-  [4, 23+bob, 16, 2, T], [7, 23+bob, 10, 2, D],  // stripe 3
-  // body outline
-  [3, 13+bob, 18, 1, K], [3, 24+bob, 18, 1, K],
-  [3, 13+bob, 1,  12,K], [20,13+bob, 1, 12, K],
-];
-
-// PAWS
-const PAWS = (bob=0) => [
-  // left paw
-  [3,  24+bob, 7, 4, O], [4, 24+bob, 5, 2, H],
-  [3,  24+bob, 1, 4, K], [9, 24+bob, 1, 4, K], [3, 27+bob, 7, 1, K],
-  [4,  26+bob, 2, 1, P], [6, 26+bob, 2, 1, P],   // toe beans
-  // right paw
-  [14, 24+bob, 7, 4, O], [15,24+bob, 5, 2, H],
-  [14, 24+bob, 1, 4, K], [20,24+bob, 1, 4, K], [14,27+bob, 7, 1, K],
-  [15, 26+bob, 2, 1, P], [17,26+bob, 2, 1, P],  // toe beans
-];
-
-// TAIL — 3 positions for wag
-const TAIL = (pos=0) => {
-  // pos: -1 left, 0 center, +1 right
-  const dx = pos;
-  return [
-    [18+dx, 15, 4, 3, O],  [20+dx, 12, 4, 4, O],
-    [21+dx, 9,  3, 4, O],  [20+dx, 7,  4, 3, H],  // tip
-    [18+dx, 16, 4, 1, T],  [20+dx, 13, 4, 1, T],  // stripes
-    [20+dx, 10, 3, 1, T],
-    // outline
-    [17+dx, 15, 1, 4, K],  [22+dx, 15, 1, 4, K],
-    [20+dx, 12, 1, 4, K],  [24+dx, 12, 1, 4, K],
-    [21+dx, 9,  1, 3, K],  [23+dx, 9,  1, 3, K],
-    [20+dx, 7,  4, 1, K],  [20+dx, 9,  1, 1, K],
-  ];
-};
-
-// WHISKERS (drawn as lines, not grid)
-function drawWhiskers(offY=0) {
+// clear a rect (for fake-rounded corners)
+function clr(x, y, w, h) {
+  cx.clearRect(x * GS, y * GS, w * GS, h * GS);
+}
+// thin line for whiskers
+function wsk(x1, y1, x2, y2) {
   cx.save();
-  cx.strokeStyle = B;
-  cx.lineWidth = Math.max(1, GS * 0.15);
-  cx.globalAlpha = 0.9;
+  cx.strokeStyle = '#FFEECC';
+  cx.lineWidth = Math.max(1, GS * 0.18);
+  cx.globalAlpha = 0.88;
   cx.lineCap = 'round';
-  const y = offY;
-  // left whiskers
-  cx.beginPath(); cx.moveTo(6*GS, (10.5+y)*GS); cx.lineTo(0.5*GS, (9.5+y)*GS);   cx.stroke();
-  cx.beginPath(); cx.moveTo(6*GS, (11.5+y)*GS); cx.lineTo(0.5*GS, (11.5+y)*GS);  cx.stroke();
-  cx.beginPath(); cx.moveTo(6*GS, (12.0+y)*GS); cx.lineTo(0.5*GS, (13.5+y)*GS);  cx.stroke();
-  // right whiskers
-  cx.beginPath(); cx.moveTo(18*GS, (10.5+y)*GS); cx.lineTo(23.5*GS, (9.5+y)*GS); cx.stroke();
-  cx.beginPath(); cx.moveTo(18*GS, (11.5+y)*GS); cx.lineTo(23.5*GS, (11.5+y)*GS);cx.stroke();
-  cx.beginPath(); cx.moveTo(18*GS, (12.0+y)*GS); cx.lineTo(23.5*GS, (13.5+y)*GS);cx.stroke();
+  cx.beginPath();
+  cx.moveTo(x1 * GS, y1 * GS);
+  cx.lineTo(x2 * GS, y2 * GS);
+  cx.stroke();
   cx.restore();
 }
 
-// RENDER: paint rects from makeFrame-style lists
-function paint(lists) {
-  for (const rects of lists) {
-    for (const [x, y, w, h, col] of rects) {
-      if (!col || col === _) continue;
-      if (col.startsWith('rgba')) {
-        cx.save(); cx.fillStyle = col; cx.fillRect(x*GS, y*GS, w*GS, h*GS); cx.restore();
-      } else {
-        cx.fillStyle = col;
-        cx.fillRect(x*GS, y*GS, w*GS, h*GS);
-      }
-    }
-  }
+// ══════════════════════════════════════════════════
+//  EARS  (earY shifts them up 1px on bob-up)
+// ══════════════════════════════════════════════════
+function drawEars(earY) {
+  // LEFT ear — pointed, inward-tilted
+  p(3, 0+earY, 3, 1, K);          // tip
+  p(2, 1+earY, 4, 1, O);
+  p(3, 1+earY, 2, 1, P);          // pink tip inner
+  p(2, 2+earY, 5, 2, O);
+  p(3, 2+earY, 3, 2, P);          // inner pink
+  p(2, 1+earY, 1, 3, K);          // left edge
+  p(6, 2+earY, 1, 2, K);          // right edge
+  p(2, 4+earY, 1, 1, K);          // join head
+
+  // RIGHT ear
+  p(16, 0+earY, 3, 1, K);
+  p(16, 1+earY, 4, 1, O);
+  p(17, 1+earY, 2, 1, P);
+  p(15, 2+earY, 5, 2, O);
+  p(16, 2+earY, 3, 2, P);
+  p(19, 1+earY, 1, 3, K);
+  p(15, 2+earY, 1, 2, K);
+  p(19, 4+earY, 1, 1, K);
 }
 
-// ═══════════════════════════════════════════
-//  DRAW IDLE
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  HEAD  — large, round, Ghibli proportions
+//  Head occupies cols 1-20, rows 4-17 (17px tall, 20px wide)
+//  Fake rounded corners: cut 2×1 and 1×2 at each corner
+// ══════════════════════════════════════════════════
+function drawHead(blush) {
+  // === BASE ===
+  // Wide rounded head block
+  p(3, 4, 16, 13, O);       // core
+  p(2, 5, 1, 11, O);        // left side extension
+  p(19, 5, 1, 11, O);       // right side extension
+  // Fake round corners (cut with transparent)
+  clr(2, 4, 1, 1); clr(19, 4, 1, 1);     // top corners
+  clr(2, 16, 1, 1); clr(19, 16, 1, 1);   // bottom corners
+
+  // === OUTLINE ===
+  p(3, 4, 16, 1, K);        // top
+  p(3, 16, 16, 1, K);       // bottom
+  p(2, 5, 1, 11, K);        // left
+  p(19, 5, 1, 11, K);       // right
+
+  // === FOREHEAD HIGHLIGHT ===
+  p(5, 5, 12, 2, H);
+
+  // === TABBY MARKINGS — subtle M on forehead ===
+  // Three delicate marks (not heavy stripes)
+  p(4, 5, 2, 3, T);   // left stroke
+  p(9, 5, 2, 2, T);   // center-left
+  p(11, 5, 2, 2, T);  // center-right
+  p(16, 5, 2, 3, T);  // right stroke
+  p(6, 6, 3, 2, T);   // left inner of M
+  p(13, 6, 3, 2, T);  // right inner of M
+  // break the M center so it doesn't look like a wall
+  p(9, 5, 4, 1, H);   // M gap (highlight overrides center top)
+
+  // Cheek stripes (tiny, 2 stripes each side)
+  p(2, 11, 3, 1, T);  p(2, 13, 3, 1, T);   // left
+  p(17, 11, 3, 1, T); p(17, 13, 3, 1, T);  // right
+
+  // === CHEEK BLUSH ===
+  if (blush) {
+    cx.save();
+    cx.globalAlpha = 0.28;
+    cx.fillStyle = P;
+    cx.fillRect(2*GS, 12*GS, 5*GS, 2*GS);
+    cx.fillRect(15*GS, 12*GS, 5*GS, 2*GS);
+    cx.restore();
+  }
+
+  // === MUZZLE ===
+  p(7, 10, 8, 6, W);        // muzzle base
+  p(6, 11, 10, 4, W);       // wider center
+  // muzzle divider line (subtle center line between muzzle pouches)
+  p(10, 10, 2, 1, O);       // top edge blend
+
+  // === NOSE — tiny & cute ===
+  p(10, 11, 2, 1, N);       // nose top
+  p(9, 12, 4, 1, N);        // nose body
+  p(10, 11, 2, 1, P);       // soft highlight on top
+
+  // nose outline (minimal)
+  p(10, 11, 2, 1, K);       // top line only
+
+  // === MOUTH — gentle Ghibli smile ===
+  p(10, 13, 2, 1, K);       // center drop
+  p(7, 14, 3, 1, K);        // left curve
+  p(12, 14, 3, 1, K);       // right curve
+}
+
+// ══════════════════════════════════════════════════
+//  EYES
+// ══════════════════════════════════════════════════
+// Left eye: cols 4-8 (5 wide), rows 6-10 (5 tall)
+// Right eye: cols 13-17 (5 wide), rows 6-10 (5 tall)
+
+function drawEyesOpen() {
+  // ── LEFT EYE ──
+  p(4, 6, 5, 5, EW);          // sclera
+  p(4, 6, 4, 5, EG);          // iris (fills most of eye)
+  p(5, 7, 2, 4, ED);          // pupil (vertical slit)
+  p(4, 6, 1, 2, EH);          // top-left highlight (big)
+  p(7, 9, 1, 1, Eh);          // bottom-right soft glow
+  // outline
+  p(4, 6, 5, 1, K); p(4, 10, 5, 1, K);
+  p(4, 6, 1, 5, K); p(8, 6, 1, 5, K);
+
+  // ── RIGHT EYE ──
+  p(13, 6, 5, 5, EW);
+  p(14, 6, 4, 5, EG);
+  p(15, 7, 2, 4, ED);
+  p(13, 6, 1, 2, EH);
+  p(16, 9, 1, 1, Eh);
+  p(13, 6, 5, 1, K); p(13, 10, 5, 1, K);
+  p(13, 6, 1, 5, K); p(17, 6, 1, 5, K);
+}
+
+function drawEyesHalf() {
+  // squinting — iris/pupil moved down
+  p(4, 8, 5, 3, EW);
+  p(4, 8, 4, 3, EG);
+  p(5, 9, 2, 2, ED);
+  p(4, 8, 5, 1, K); p(4, 10, 5, 1, K);
+  p(13, 8, 5, 3, EW);
+  p(14, 8, 4, 3, EG);
+  p(15, 9, 2, 2, ED);
+  p(13, 8, 5, 1, K); p(13, 10, 5, 1, K);
+}
+
+function drawEyesClosed() {
+  // cute closed arcs — very Ghibli
+  p(4, 9, 5, 1, K);  p(5, 8, 3, 1, K);   // left arc
+  p(13, 9, 5, 1, K); p(14, 8, 3, 1, K);  // right arc
+}
+
+function drawEyesHappy() {
+  // ^ ^ shape — pure joy
+  p(5, 8, 3, 1, K); p(4, 9, 2, 1, K); p(7, 9, 2, 1, K);   // left ^
+  p(14, 8, 3, 1, K); p(13, 9, 2, 1, K); p(16, 9, 2, 1, K); // right ^
+  // pink blush under eyes
+  cx.save(); cx.globalAlpha = 0.4; cx.fillStyle = P;
+  cx.fillRect(3*GS, 10*GS, 4*GS, 2*GS);
+  cx.fillRect(15*GS, 10*GS, 4*GS, 2*GS);
+  cx.restore();
+}
+
+function drawWhiskers() {
+  // Left: 3 whiskers spreading left
+  wsk(7, 11.5, 0.5, 10.5);
+  wsk(7, 12.5, 0.5, 12.5);
+  wsk(7, 13.5, 0.5, 14.5);
+  // Right: 3 whiskers spreading right
+  wsk(15, 11.5, 21.5, 10.5);
+  wsk(15, 12.5, 21.5, 12.5);
+  wsk(15, 13.5, 21.5, 14.5);
+}
+
+// ══════════════════════════════════════════════════
+//  BODY  (rows 17–24, cols 3–18)
+// ══════════════════════════════════════════════════
+function drawBody(bob) {
+  const b = bob;
+  // shadow
+  cx.save(); cx.globalAlpha = 0.18; cx.fillStyle = '#000';
+  cx.fillRect(4*GS, (25+b)*GS, 14*GS, GS); cx.restore();
+
+  // body — oval-ish, slightly wider than head
+  p(4, 17+b, 14, 8, O);
+  p(3, 18+b, 16, 6, O);    // widen middle
+  // round corners
+  clr(3, 17+b, 1, 1); clr(17, 17+b, 1, 1);
+  clr(3, 24+b, 1, 1); clr(17, 24+b, 1, 1);
+  // belly white
+  p(6, 18+b, 10, 6, W);
+  p(5, 19+b, 12, 4, W);
+  // body stripes — subtle, tabby style
+  p(3, 19+b, 16, 1, T);    // top stripe
+  p(7, 19+b, 8, 1, D);     // break it
+  p(3, 22+b, 16, 1, T);    // mid stripe
+  p(7, 22+b, 8, 1, D);
+  // outline
+  p(4, 17+b, 14, 1, K); p(4, 24+b, 14, 1, K);
+  p(3, 18+b, 1, 6, K);  p(18, 18+b, 1, 6, K);
+}
+
+// ══════════════════════════════════════════════════
+//  PAWS  (rows 24–27)
+// ══════════════════════════════════════════════════
+function drawPaws(bob) {
+  const b = bob;
+  // left paw — round bean
+  p(4, 24+b, 6, 4, O);
+  p(4, 24+b, 6, 1, H);       // highlight top
+  p(4, 24+b, 1, 4, K); p(9, 24+b, 1, 4, K); p(4, 27+b, 6, 1, K);
+  clr(4, 27+b, 1, 1); clr(9, 27+b, 1, 1);   // round bottom corners
+  // toe beans
+  p(5, 26+b, 2, 1, P); p(7, 26+b, 2, 1, P);
+
+  // right paw
+  p(12, 24+b, 6, 4, O);
+  p(12, 24+b, 6, 1, H);
+  p(12, 24+b, 1, 4, K); p(17, 24+b, 1, 4, K); p(12, 27+b, 6, 1, K);
+  clr(12, 27+b, 1, 1); clr(17, 27+b, 1, 1);
+  p(13, 26+b, 2, 1, P); p(15, 26+b, 2, 1, P);
+}
+
+// ══════════════════════════════════════════════════
+//  TAIL  (3 positions for wag: -1, 0, +1)
+// ══════════════════════════════════════════════════
+function drawTail(pos, bob) {
+  const dx = pos, b = bob;
+  p(17+dx, 18+b, 3, 4, O);
+  p(19+dx, 15+b, 3, 4, O);
+  p(20+dx, 12+b, 3, 4, O);
+  p(19+dx, 10+b, 3, 3, H);   // fluffy tip
+  // stripes on tail
+  p(17+dx, 20+b, 3, 1, T);
+  p(19+dx, 17+b, 3, 1, T);
+  p(20+dx, 14+b, 3, 1, T);
+  // outline
+  p(17+dx, 18+b, 1, 5, K); p(20+dx, 18+b, 1, 4, K);
+  p(19+dx, 15+b, 1, 3, K); p(22+dx, 15+b, 1, 4, K);
+  p(20+dx, 12+b, 1, 3, K); p(23+dx, 12+b, 1, 3, K);
+  p(19+dx, 10+b, 3, 1, K);  // tip top
+}
+
+// ══════════════════════════════════════════════════
+//  DRAW IDLE FRAME
+// ══════════════════════════════════════════════════
 function drawIdle(bob, eyeMode, tailPos, earBob) {
   cx.clearRect(0, 0, cv.width, cv.height);
-  paint([TAIL(tailPos)]);
-  paint([BODY(bob), PAWS(bob)]);
-  paint([HEAD(earBob + bob)]);
-  const eyes = eyeMode === 0 ? EYES_OPEN : eyeMode === 1 ? EYES_HALF : eyeMode === 2 ? EYES_CLOSED : EYES_HAPPY;
-  paint([eyes]);
-  drawWhiskers(0);
+  drawTail(tailPos, bob);
+  drawBody(bob);
+  drawPaws(bob);
+  drawEars(earBob + bob);
+  drawHead(true);
+  if      (eyeMode === 0) drawEyesOpen();
+  else if (eyeMode === 1) drawEyesHalf();
+  else if (eyeMode === 2) drawEyesClosed();
+  else                    drawEyesHappy();
+  drawWhiskers();
 }
 
-// ═══════════════════════════════════════════
-//  DRAW SLEEPING (loaf/crescent curl)
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  SLEEPING  — curled crescent / loaf
+// ══════════════════════════════════════════════════
 function drawSleeping(phase) {
   cx.clearRect(0, 0, cv.width, cv.height);
-  const br = Math.sin(phase * 0.0025) * 0.4 | 0;  // subtle breathe 0 or 0
 
+  // === BODY LOAF ===
   // shadow
-  cx.fillStyle = 'rgba(0,0,0,0.2)';
-  cx.fillRect(3*GS, 30*GS, 18*GS, GS);
+  cx.save(); cx.globalAlpha = 0.15; cx.fillStyle='#000';
+  cx.fillRect(3*GS, 27*GS, 16*GS, GS); cx.restore();
 
-  // curled tail wrapping around left
-  paint([[
-    [0, 17, 4, 8, O], [0, 16, 5, 2, O], [0, 24, 4, 2, H],
-    [0, 19, 4, 2, T], [0, 23, 4, 1, T],
-    [0, 16, 1, 10, K], [4, 16, 1, 4, K], [0, 25, 5, 1, K],
-  ]]);
+  // body
+  p(3, 18, 16, 9, O);
+  p(2, 19, 18, 7, O);
+  clr(2, 18, 1, 1); clr(18, 18, 1, 1);
+  clr(2, 26, 1, 1); clr(18, 26, 1, 1);
+  // belly
+  p(5, 19, 12, 7, W); p(4, 20, 14, 5, W);
+  // stripes
+  p(2, 20, 18, 1, T); p(6, 20, 10, 1, D);
+  p(2, 23, 18, 1, T); p(6, 23, 10, 1, D);
+  // outline
+  p(3, 18, 16, 1, K); p(3, 26, 16, 1, K);
+  p(2, 19, 1, 7, K);  p(19, 19, 1, 7, K);
 
-  // body loaf
-  paint([[
-    [3, 17, 18, 11, O],
-    [2, 19, 20,  7, O],   // wider mid
-    // round corners
-    [2, 17, 1, 1, _], [20,17, 1, 1, _],
-    [2, 27, 1, 1, _], [20,27, 1, 1, _],
-    [5, 19, 14, 7, W],    // belly
-    [4, 20, 16, 5, W],
-    // stripes
-    [3, 19, 18, 2, T], [6, 19, 12, 2, D],
-    [3, 23, 18, 2, T], [6, 23, 12, 2, D],
-    // outline
-    [2, 17, 20, 1, K], [2, 27, 20, 1, K],
-    [2, 17, 1, 11,K], [21,17, 1, 11,K],
-  ]]);
+  // === TUCKED PAWS ===
+  p(4, 25, 6, 3, O);  p(4, 25, 6, 1, H);
+  p(4, 25, 1, 3, K);  p(9, 25, 1, 3, K);  p(4, 27, 6, 1, K);
+  p(5, 26, 2, 1, P);  p(7, 26, 2, 1, P);
+  p(12, 25, 6, 3, O); p(12, 25, 6, 1, H);
+  p(12, 25, 1, 3, K); p(17, 25, 1, 3, K); p(12, 27, 6, 1, K);
+  p(13, 26, 2, 1, P); p(15, 26, 2, 1, P);
 
-  // tucked paws
-  paint([[
-    [4, 26, 8, 3, O], [5, 26, 6, 1, H],
-    [4, 26, 1, 3, K], [11,26, 1, 3, K], [4, 28, 8, 1, K],
-    [5, 27, 2, 1, P], [7, 27, 2, 1, P],
-    [13,26, 8, 3, O], [14,26, 6, 1, H],
-    [13,26, 1, 3, K], [20,26, 1, 3, K], [13,28, 8, 1, K],
-    [14,27, 2, 1, P], [16,27, 2, 1, P],
-  ]]);
+  // === TAIL curled around left ===
+  p(0, 19, 4, 7, O);
+  p(0, 19, 4, 2, H);     // tip
+  p(0, 22, 4, 1, T); p(0, 25, 4, 1, T);
+  p(0, 19, 1, 8, K); p(0, 26, 5, 1, K);
+  p(4, 21, 1, 5, K);
 
-  // sleeping head — resting on body, slightly left
-  const hx = 2, hy = 7;
-  paint([[
-    // left ear
-    [hx+3, hy-2, 2, 3, O], [hx+2, hy-1, 4, 3, O], [hx+3, hy-1, 2, 2, P],
-    [hx+2, hy-2, 1, 4, K], [hx+5, hy-1, 1, 3, K], [hx+3, hy-2, 2, 1, K],
-    // right ear
-    [hx+15, hy-2, 2, 3, O], [hx+14, hy-1, 4, 3, O], [hx+15, hy-1, 2, 2, P],
-    [hx+14, hy-2, 1, 4, K], [hx+17, hy-1, 1, 3, K], [hx+15, hy-2, 2, 1, K],
-    // head
-    [hx+1, hy, 18, 10, O],
-    [hx+0, hy, 1,  1, _], [hx+18,hy, 1, 1, _],       // round corners
-    [hx+0, hy+9, 1, 1, _], [hx+18,hy+9, 1, 1, _],
-    [hx+2, hy, 2, 2, H],  [hx+14,hy, 2, 2, H],        // top highlight
-    // outline
-    [hx+1, hy, 18, 1, K], [hx+1, hy+9, 18, 1, K],
-    [hx+1, hy, 1, 9, K],  [hx+18,hy,   1, 9, K],
-    // M marking
-    [hx+2,hy, 2, 3, T], [hx+5,hy, 2, 2, T], [hx+9,hy, 2, 2, T],
-    [hx+13,hy,2, 2, T], [hx+16,hy,2, 3, T],
-    // cheeks
-    [hx+1, hy+5, 3, 3, H], [hx+16,hy+5, 3, 3, H],
-    [hx+1, hy+6, 3, 1, T], [hx+16,hy+6, 3, 1, T],
-    // muzzle
-    [hx+4, hy+5, 12, 4, W], [hx+3, hy+6, 14, 2, W],
-    // closed eyes — cute happy arc
-    [hx+3, hy+3, 6, 1, K], [hx+4, hy+2, 4, 1, K],   // left eye arc
-    [hx+11,hy+3, 6, 1, K], [hx+11,hy+2, 4, 1, K],   // right eye arc
-    // nose
-    [hx+8, hy+6, 4, 2, N], [hx+9, hy+6, 2, 1, P],
-    [hx+8, hy+6, 4, 1, K], [hx+8, hy+7, 1, 1, K], [hx+11,hy+7, 1, 1, K],
-    // mouth
-    [hx+9, hy+8, 2, 1, K],
-    [hx+6, hy+9, 3, 1, K], [hx+11,hy+9, 3, 1, K],
-  ]]);
+  // === SLEEPING HEAD (resting on body, slightly right) ===
+  const hx = 3, hy = 7;  // head offset from top-left
+
+  // ears
+  p(hx+2, hy-2, 2, 1, K);
+  p(hx+1, hy-1, 4, 1, O); p(hx+2, hy-1, 2, 1, P);
+  p(hx+1, hy,   4, 2, O); p(hx+2, hy,   2, 2, P);
+  p(hx+1, hy-1, 1, 3, K); p(hx+4, hy,   1, 2, K);
+
+  p(hx+13, hy-2, 2, 1, K);
+  p(hx+12, hy-1, 4, 1, O); p(hx+13, hy-1, 2, 1, P);
+  p(hx+12, hy,   4, 2, O); p(hx+13, hy,   2, 2, P);
+  p(hx+15, hy-1, 1, 3, K); p(hx+12, hy,   1, 2, K);
+
+  // head blob
+  p(hx+1, hy+2, 16, 11, O);
+  p(hx,   hy+3, 1,  9,  O); p(hx+17, hy+3, 1, 9, O);
+  clr(hx, hy+2, 1, 1); clr(hx+17, hy+2, 1, 1);
+  clr(hx, hy+12,1, 1); clr(hx+17,hy+12, 1, 1);
+  // outline
+  p(hx+1, hy+2, 16, 1, K); p(hx+1, hy+12, 16, 1, K);
+  p(hx,   hy+3, 1,  9, K); p(hx+17, hy+3, 1,  9, K);
+
+  // forehead highlights
+  p(hx+3, hy+3, 12, 2, H);
+  // subtle tabby marks
+  p(hx+2,  hy+3, 2, 3, T); p(hx+16, hy+3, 2, 3, T);
+  p(hx+7,  hy+3, 2, 2, T); p(hx+10, hy+3, 2, 2, T);
+
+  // cheek blush
+  cx.save(); cx.globalAlpha = 0.25; cx.fillStyle = P;
+  cx.fillRect((hx)*GS, (hy+8)*GS, 4*GS, 2*GS);
+  cx.fillRect((hx+13)*GS, (hy+8)*GS, 4*GS, 2*GS);
+  cx.restore();
+
+  // muzzle
+  p(hx+5, hy+7, 8, 5, W); p(hx+4, hy+8, 10, 3, W);
+
+  // SLEEPING EYES — big soft closed arcs
+  p(hx+2, hy+6, 5, 1, K); p(hx+3, hy+5, 3, 1, K);   // left arc
+  p(hx+11,hy+6, 5, 1, K); p(hx+12,hy+5, 3, 1, K);   // right arc
+  // tiny sparkle dots (eyes highlight even when closed = dreamy)
+  cx.save(); cx.globalAlpha = 0.5; cx.fillStyle = '#CCFFEE';
+  cx.fillRect((hx+4)*GS, (hy+5)*GS, GS, GS);
+  cx.fillRect((hx+13)*GS,(hy+5)*GS, GS, GS);
+  cx.restore();
+
+  // nose
+  p(hx+8, hy+8, 2, 1, N); p(hx+7, hy+9, 4, 1, N);
+  p(hx+8, hy+8, 2, 1, K);
+
+  // mouth
+  p(hx+8, hy+10, 2, 1, K);
+  p(hx+6, hy+11, 2, 1, K); p(hx+10, hy+11, 2, 1, K);
 
   // whiskers on sleeping head
   cx.save();
-  cx.strokeStyle = B; cx.lineWidth = Math.max(1, GS*0.15);
-  cx.globalAlpha = 0.85; cx.lineCap = 'round';
+  cx.strokeStyle = '#FFEECC'; cx.lineWidth = Math.max(1, GS*0.18);
+  cx.globalAlpha = 0.8; cx.lineCap = 'round';
   const wx = hx, wy = hy;
-  cx.beginPath(); cx.moveTo((wx+4)*GS, (wy+6.5)*GS); cx.lineTo((wx-2)*GS, (wy+5.5)*GS); cx.stroke();
-  cx.beginPath(); cx.moveTo((wx+4)*GS, (wy+7.5)*GS); cx.lineTo((wx-2)*GS, (wy+7.5)*GS); cx.stroke();
-  cx.beginPath(); cx.moveTo((wx+14)*GS,(wy+6.5)*GS); cx.lineTo((wx+20)*GS,(wy+5.5)*GS); cx.stroke();
-  cx.beginPath(); cx.moveTo((wx+14)*GS,(wy+7.5)*GS); cx.lineTo((wx+20)*GS,(wy+7.5)*GS); cx.stroke();
+  cx.beginPath(); cx.moveTo((wx+5)*GS,(wy+8.5)*GS); cx.lineTo((wx-1)*GS,(wy+7.5)*GS); cx.stroke();
+  cx.beginPath(); cx.moveTo((wx+5)*GS,(wy+9.5)*GS); cx.lineTo((wx-1)*GS,(wy+9.5)*GS); cx.stroke();
+  cx.beginPath(); cx.moveTo((wx+13)*GS,(wy+8.5)*GS);cx.lineTo((wx+19)*GS,(wy+7.5)*GS);cx.stroke();
+  cx.beginPath(); cx.moveTo((wx+13)*GS,(wy+9.5)*GS);cx.lineTo((wx+19)*GS,(wy+9.5)*GS);cx.stroke();
   cx.restore();
 
-  // floating zzz sparkles
-  const sp = (Math.sin(phase * 0.003) + 1) * 0.5;
+  // Zzz particles (inline, baked into sprite)
+  const t = phase;
+  const z1 = (Math.sin(t*0.003)+1)*0.5;
+  const z2 = (Math.sin(t*0.003 + 1.5)+1)*0.5;
   cx.save();
-  cx.fillStyle = '#aaaaff'; cx.font = `${GS}px 'Press Start 2P', monospace`;
-  cx.globalAlpha = sp * 0.6; cx.fillText('z', 17*GS, 12*GS);
-  cx.globalAlpha = sp * 0.35; cx.fillText('z', 19*GS, 9*GS);
+  cx.font = `${GS+2}px 'Press Start 2P',monospace`;
+  cx.fillStyle = '#9999ee'; cx.shadowColor = '#6666ff'; cx.shadowBlur = 6;
+  cx.globalAlpha = z1 * 0.7;  cx.fillText('z', 17*GS, 11*GS);
+  cx.globalAlpha = z2 * 0.45; cx.fillText('Z', 19*GS,  7*GS);
   cx.restore();
 }
 
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════
 //  STAR BACKGROUND
-// ═══════════════════════════════════════════
-const bgc = document.getElementById('bg');
+// ══════════════════════════════════════════════════
+const bgc  = document.getElementById('bg');
 const bctx = bgc.getContext('2d');
+const stars = [];
 function buildStars() {
   bgc.width = window.innerWidth; bgc.height = window.innerHeight;
-  bctx.clearRect(0, 0, bgc.width, bgc.height);
-  for (let i = 0; i < 100; i++) {
-    bctx.beginPath();
-    bctx.arc(Math.random()*bgc.width, Math.random()*bgc.height, 0.5+Math.random()*1.5, 0, Math.PI*2);
-    bctx.fillStyle = `rgba(${180+Math.random()*75|0},${180+Math.random()*75|0},255,${0.2+Math.random()*0.7})`;
-    bctx.fill();
+  stars.length = 0;
+  for (let i = 0; i < 80; i++) stars.push({
+    x: Math.random()*bgc.width, y: Math.random()*bgc.height,
+    r: 0.5+Math.random()*1.5, a: 0.15+Math.random()*0.65,
+    twinkle: Math.random()*Math.PI*2
+  });
+}
+function drawStars(t) {
+  bctx.clearRect(0,0,bgc.width,bgc.height);
+  for (const s of stars) {
+    const a = s.a * (0.6 + 0.4*Math.sin(s.twinkle + t*0.0008));
+    bctx.beginPath(); bctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    bctx.fillStyle = `rgba(210,210,255,${a})`; bctx.fill();
   }
 }
 buildStars();
 window.addEventListener('resize', buildStars);
 
-// ═══════════════════════════════════════════
-//  FX CANVAS (hearts + zzz)
-// ═══════════════════════════════════════════
-const fxc = document.getElementById('fx');
+// ══════════════════════════════════════════════════
+//  FX CANVAS
+// ══════════════════════════════════════════════════
+const fxc  = document.getElementById('fx');
 const fctx = fxc.getContext('2d');
-function resizeFx() { fxc.width = window.innerWidth; fxc.height = window.innerHeight; }
-resizeFx();
-window.addEventListener('resize', resizeFx);
+function resizeFx() { fxc.width=window.innerWidth; fxc.height=window.innerHeight; }
+resizeFx(); window.addEventListener('resize', resizeFx);
 
 const particles = [];
-function spawnHearts(x, y) {
-  for (let i = 0; i < 6; i++)
-    particles.push({ type:'heart', x:x+(Math.random()-.5)*80, y,
-      vy:-(1.5+Math.random()*2.5), vx:(Math.random()-.5)*2.5,
-      size:8+Math.random()*12, alpha:1, hue:Math.random()*40-20 });
+function spawnHearts(x,y) {
+  for (let i=0;i<7;i++) particles.push({
+    type:'heart', x:x+(Math.random()-.5)*90, y,
+    vy:-(1.4+Math.random()*2.8), vx:(Math.random()-.5)*2.5,
+    size:8+Math.random()*13, alpha:1, hue:Math.random()*50-20
+  });
 }
 function spawnZzz() {
   const r = cv.getBoundingClientRect();
-  particles.push({ type:'zzz', x:r.right-15, y:r.top+r.height*0.3,
-    text:Math.random()<.5?'z':'Z', vy:-(0.4+Math.random()*.5),
-    vx:0.3+Math.random()*.5, size:8+Math.floor(Math.random()*9), alpha:1 });
+  particles.push({
+    type:'zzz', x:r.right-10, y:r.top+r.height*0.3,
+    text:Math.random()<.5?'z':'Z', vy:-(0.35+Math.random()*.5),
+    vx:0.3+Math.random()*.5, size:8+Math.floor(Math.random()*9), alpha:1
+  });
 }
-function drawPixelHeart(ctx, x, y, s, alpha, hue) {
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.fillStyle = `hsl(${340+hue},100%,72%)`;
-  ctx.shadowColor = `hsl(${340+hue},100%,80%)`; ctx.shadowBlur = 8;
-  ctx.translate(x, y);
-  const p = s/4;
-  ctx.fillRect(-p*2,-p,p,p); ctx.fillRect(p,-p,p,p);
-  ctx.fillRect(-p*3,0,p*6,p);
-  ctx.fillRect(-p*2,p,p*4,p);
-  ctx.fillRect(-p,p*2,p*2,p);
+function drawPixelHeart(ctx,x,y,s,alpha,hue) {
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.fillStyle=`hsl(${340+hue},100%,72%)`;
+  ctx.shadowColor=`hsl(${340+hue},100%,82%)`; ctx.shadowBlur=10;
+  ctx.translate(x,y);
+  const q=s/4;
+  ctx.fillRect(-q*2,-q,q,q); ctx.fillRect(q,-q,q,q);
+  ctx.fillRect(-q*3,0,q*6,q);
+  ctx.fillRect(-q*2,q,q*4,q);
+  ctx.fillRect(-q,q*2,q*2,q);
   ctx.restore();
 }
 function tickParticles() {
-  fctx.clearRect(0, 0, fxc.width, fxc.height);
-  for (let i = particles.length-1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx; p.y += p.vy; p.alpha -= 0.014;
-    if (p.alpha <= 0) { particles.splice(i,1); continue; }
-    if (p.type === 'heart') drawPixelHeart(fctx, p.x, p.y, p.size, p.alpha, p.hue);
+  fctx.clearRect(0,0,fxc.width,fxc.height);
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.alpha-=0.013;
+    if (p.alpha<=0) { particles.splice(i,1); continue; }
+    if (p.type==='heart') drawPixelHeart(fctx,p.x,p.y,p.size,p.alpha,p.hue);
     else {
-      fctx.save(); fctx.globalAlpha = p.alpha;
-      fctx.fillStyle = '#aaaaff'; fctx.shadowColor = '#6677ff'; fctx.shadowBlur = 8;
-      fctx.font = `${p.size}px 'Press Start 2P',monospace`;
-      fctx.fillText(p.text, p.x, p.y); fctx.restore();
+      fctx.save(); fctx.globalAlpha=p.alpha;
+      fctx.fillStyle='#aaaaff'; fctx.shadowColor='#7788ff'; fctx.shadowBlur=8;
+      fctx.font=`${p.size}px 'Press Start 2P',monospace`;
+      fctx.fillText(p.text,p.x,p.y); fctx.restore();
     }
   }
 }
 
-// ═══════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════
-let sleeping     = false;
-let phase        = 0;
-let blinkTimer   = 0;
-let blinkIval    = 3000 + Math.random()*2500;
-let blinkState   = 0;   // 0=open 1=half 2=closed
-let tailTimer    = 0;
-let tailPos      = 0;   // -1 0 +1
-let tailDir      = 1;
-let earBob       = 0;   // 0 or -1 (ears go up on bob down)
-let petTimer     = 0;   // > 0 = happy face showing
-let zzzTick      = 0;
-let lastInteract = Date.now();
-let lastTs       = 0;
+// ══════════════════════════════════════════════════
+//  STATE MACHINE
+// ══════════════════════════════════════════════════
+let sleeping    = false;
+let phase       = 0;
+let blinkTimer  = 0;
+let blinkIval   = 3500 + Math.random()*2500;
+let blinkState  = 0;      // 0 open | 1 half | 2 closed
+let tailTimer   = 0;
+let tailPos     = 0;      // -1 | 0 | +1
+let tailDir     = 1;
+let earBob      = 0;      // 0 or -1
+let petTimer    = 0;      // > 0 → show happy eyes
+let zzzTick     = 0;
+let lastInteract= Date.now();
+let lastTs      = 0;
 
 const modeLabel = document.getElementById('mode-label');
 
@@ -539,37 +624,36 @@ function loop(ts) {
 
   if (!sleeping && Date.now() - lastInteract > 10000) setMode(true);
 
+  drawStars(phase);   // twinkling stars
+
   if (sleeping) {
     zzzTick += dt;
     if (zzzTick > 1400) { zzzTick = 0; spawnZzz(); }
     drawSleeping(phase);
   } else {
-    // bob: slow 0/1 pulse
-    const bob = Math.floor(phase / 600) % 2;
-    earBob = bob ? -1 : 0;  // ears go up when body bobs down
+    const bob = Math.floor(phase/650) % 2;
+    earBob = bob ? -1 : 0;
 
-    // tail wag
     tailTimer += dt;
-    if (tailTimer > 500) {
+    if (tailTimer > 550) {
       tailTimer = 0;
       tailPos += tailDir;
       if (tailPos >= 1) tailDir = -1;
       if (tailPos <= -1) tailDir = 1;
     }
 
-    // blink
     let eyeMode = 0;
     if (petTimer > 0) {
       petTimer -= dt;
-      eyeMode = 3; // happy ^^ eyes
+      eyeMode = 3;
     } else {
       blinkTimer += dt;
       if (blinkTimer > blinkIval) {
         const bt = blinkTimer - blinkIval;
         if      (bt < 80)  eyeMode = 1;
         else if (bt < 160) eyeMode = 2;
-        else if (bt < 240) eyeMode = 1;
-        else { eyeMode = 0; blinkTimer = 0; blinkIval = 2500+Math.random()*3000; }
+        else if (bt < 250) eyeMode = 1;
+        else { blinkTimer = 0; blinkIval = 2800+Math.random()*3000; eyeMode = 0; }
       }
     }
 
@@ -579,20 +663,20 @@ function loop(ts) {
   tickParticles();
 }
 
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════
 //  INPUT
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════
 function onInteract(e) {
   lastInteract = Date.now();
-  if (sleeping) { setMode(false); }
-  else { petTimer = 900; }  // happy face for 0.9s
+  if (sleeping) setMode(false);
+  else petTimer = 950;
   let x, y;
-  if (e.touches) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
-  else           { x = e.clientX;             y = e.clientY; }
+  if (e.touches) { x=e.touches[0].clientX; y=e.touches[0].clientY; }
+  else           { x=e.clientX;            y=e.clientY; }
   spawnHearts(x, y);
 }
 document.addEventListener('click',      onInteract);
-document.addEventListener('touchstart', onInteract, { passive: true });
+document.addEventListener('touchstart', onInteract, { passive:true });
 document.addEventListener('mousemove',  () => lastInteract = Date.now());
 
 requestAnimationFrame(loop);
